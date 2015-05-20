@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   consts.h
 //
 //   Project: EPA SWMM5
@@ -33,7 +53,8 @@
 #define   PI                 3.141592654    // Value of pi
 #define   GRAVITY            32.2           // accel. of gravity in US units
 #define   SI_GRAVITY         9.81           // accel of gravity in SI units
-#define   MAXFILESIZE        2147483647L    // largest file size in bytes
+//2014-11-10:EMNET ------------ #define   MAXFILESIZE        2147483647L    // largest file size in bytes
+#define   MAXFILESIZE        9223372036854775807LL    //2014-11-10:EMNET: largest file size in bytes, using LONG LONG = INT8 = fpos_t 
 
 //-----------------------------
 // Units factor in Manning Eqn.

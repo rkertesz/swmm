@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   rdii.c
 //
 //   Project:  EPA SWMM5
@@ -82,8 +102,15 @@ static int        RdiiFileType;        // type (binary/text) of RDII file
 //-----------------------------------------------------------------------------
 // Imported Variables
 //-----------------------------------------------------------------------------
-extern double     Qcf[];               // flow units conversion factors
+//2014-09-08:EMNET ----- THIS DOES NOT WORK WITH c++ COMPILE OPTION ----------- extern double     Qcf[];               // flow units conversion factors
                                        // (see swmm5.c)
+
+//2014-08-11:EMNET: copied Qcf[] from swmm5.c, like 5.0 source code:
+//2014-08-15:EMNET: as a DLL, needed these lines:
+const double Qcf[6] =                  // Flow Conversion Factors:
+{ 1.0, 448.831, 0.64632,     // cfs, gpm, mgd --> cfs
+0.02832, 28.317, 2.4466 };    // cms, lps, mld --> cfs
+
 //-----------------------------------------------------------------------------
 //  External functions (declared in funcs.h)
 //-----------------------------------------------------------------------------

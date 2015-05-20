@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   output.c
 //
 //   Project:  EPA SWMM5
@@ -27,9 +47,12 @@ enum InputDataType {INPUT_TYPE_CODE, INPUT_AREA, INPUT_INVERT, INPUT_MAX_DEPTH,
 //-----------------------------------------------------------------------------
 //  Shared variables    
 //-----------------------------------------------------------------------------
+
+//2014-11-10:EMNET: keep these file position pointers as INT4.  Certainly the OutputStartPos will not be > 2.1G.
 static INT4      IDStartPos;           // starting file position of ID names
 static INT4      InputStartPos;        // starting file position of input data
 static INT4      OutputStartPos;       // starting file position of output data
+
 static INT4      BytesPerPeriod;       // bytes saved per simulation time period
 static INT4      NsubcatchResults;     // number of subcatchment output variables
 static INT4      NnodeResults;         // number of node output variables
@@ -353,6 +376,8 @@ void  output_checkFileSize()
 //  Purpose: checks if the size of the binary output file will be too big
 //           to access using an integer file pointer variable.
 //
+//2014-11-10:EMNET: changed file pointers to use INT8 = fpos_t (and changed MAXFILESIZE accordingly)
+//
 {
     if ( RptFlags.subcatchments != NONE ||
          RptFlags.nodes != NONE ||
@@ -555,6 +580,9 @@ void output_saveNodeResults(double reportTime, FILE* file)
     double f = (reportTime - OldRoutingTime) /
                (NewRoutingTime - OldRoutingTime);
 
+	if (f != 1.0)
+		f = f;			//EMNET TEST --- BREAKPOINT
+
     // --- write node results to file
     for (j=0; j<Nobjects[NODE]; j++)
     {
@@ -622,10 +650,26 @@ void output_readDateTime(int period, DateTime* days)
 //           from the binary output file.
 //
 {
-    INT4 bytePos = OutputStartPos + (period-1)*BytesPerPeriod;
-    fseek(Fout.file, bytePos, SEEK_SET);
+	static fpos_t existingBytePos;
+	static bool   simulationInProgress;
+
+	simulationInProgress = (NewRoutingTime < TotalDuration);		//2014-09-12:EMNET: iff the Simulation is still running, we must preserve the file position pointer
+	if (simulationInProgress) {
+		fgetpos(Fout.file, &existingBytePos);		//2014-09-11:EMNET: record current position in binary output file before we read from it
+	}
+	
+	//2014-11-10:EMNET --------- INT4 bytePos = OutputStartPos + (period - 1)*BytesPerPeriod;
+	fpos_t bytePos = (fpos_t)OutputStartPos + (fpos_t)(period - 1) * (fpos_t)BytesPerPeriod;		//2014-11-10:EMNET: use 8-byte integer arithmetic to handle over 2.1G
+
+	//2014-11-10:EMNET --------- fseek(Fout.file, bytePos, SEEK_SET);
+	_fseeki64(Fout.file, bytePos, SEEK_SET);							//2014-11-10:EMNET: use _fseeki64 to handle over 2.1G
+
     *days = NO_DATE;
     fread(days, sizeof(REAL8), 1, Fout.file);
+
+	if (simulationInProgress)  {
+		fsetpos(Fout.file, &existingBytePos);			//2014-09-11:EMNET: restore original position in binary output file
+	}
 }
 
 //=============================================================================
@@ -639,10 +683,27 @@ void output_readSubcatchResults(int period, int index)
 //           period.
 //
 {
-    INT4 bytePos = OutputStartPos + (period-1)*BytesPerPeriod;
-    bytePos += sizeof(REAL8) + index*NsubcatchResults*sizeof(REAL4);
-    fseek(Fout.file, bytePos, SEEK_SET);
+	static fpos_t existingBytePos;
+	static bool   simulationInProgress;
+
+	simulationInProgress = (NewRoutingTime < TotalDuration);		//2014-09-12:EMNET: iff the Simulation is still running, we must preserve the file position pointer
+	if (simulationInProgress) {
+		fgetpos(Fout.file, &existingBytePos);		//2014-09-11:EMNET: record current position in binary output file before we read from it
+	}
+
+	//2014-11-10:EMNET --------- INT4 bytePos = OutputStartPos + (period - 1)*BytesPerPeriod;
+	fpos_t bytePos = (fpos_t)OutputStartPos + (fpos_t)(period - 1) * (fpos_t)BytesPerPeriod;		//2014-11-10:EMNET: use 8-byte integer arithmetic to handle over 2.1G
+
+	bytePos += sizeof(REAL8) + index*NsubcatchResults*sizeof(REAL4);
+	
+	//2014-11-10:EMNET --------- fseek(Fout.file, bytePos, SEEK_SET);
+	_fseeki64(Fout.file, bytePos, SEEK_SET);							//2014-11-10:EMNET: use _fseeki64 to handle over 2.1G
+
     fread(SubcatchResults, sizeof(REAL4), NsubcatchResults, Fout.file);
+
+	if (simulationInProgress)  {
+		fsetpos(Fout.file, &existingBytePos);			//2014-09-11:EMNET: restore original position in binary output file
+	}
 }
 
 //=============================================================================
@@ -655,11 +716,29 @@ void output_readNodeResults(int period, int index)
 //  Purpose: reads computed results for a node at a specific time period.
 //
 {
-    INT4 bytePos = OutputStartPos + (period-1)*BytesPerPeriod;
-    bytePos += sizeof(REAL8) + NumSubcatch*NsubcatchResults*sizeof(REAL4);
-    bytePos += index*NnodeResults*sizeof(REAL4);
-    fseek(Fout.file, bytePos, SEEK_SET);
-    fread(NodeResults, sizeof(REAL4), NnodeResults, Fout.file);
+	static fpos_t existingBytePos;
+	static bool   simulationInProgress;
+
+	simulationInProgress = (NewRoutingTime < TotalDuration);		//2014-09-12:EMNET: iff the Simulation is still running, we must preserve the file position pointer
+	if (simulationInProgress) {		
+		fgetpos(Fout.file, &existingBytePos);		//2014-09-11:EMNET: record current position in binary output file before we read from it
+	}
+
+	//2014-11-10:EMNET --------- INT4 bytePos = OutputStartPos + (period - 1)*BytesPerPeriod;
+	fpos_t bytePos = (fpos_t)OutputStartPos + (fpos_t)(period - 1) * (fpos_t)BytesPerPeriod;		//2014-11-10:EMNET: use 8-byte integer arithmetic to handle over 2.1G
+
+	bytePos += sizeof(REAL8) + NumSubcatch*NsubcatchResults*sizeof(REAL4);
+	bytePos += index*NnodeResults*sizeof(REAL4);
+	
+	//2014-11-10:EMNET --------- fseek(Fout.file, bytePos, SEEK_SET);
+	_fseeki64(Fout.file, bytePos, SEEK_SET);							//2014-11-10:EMNET: use _fseeki64 to handle over 2.1G
+
+	
+	fread(NodeResults, sizeof(REAL4), NnodeResults, Fout.file);
+
+	if (simulationInProgress)  {
+		fsetpos(Fout.file, &existingBytePos);			//2014-09-11:EMNET: restore original position in binary output file
+	}
 }
 
 //=============================================================================
@@ -672,13 +751,30 @@ void output_readLinkResults(int period, int index)
 //  Purpose: reads computed results for a link at a specific time period.
 //
 {
-    INT4 bytePos = OutputStartPos + (period-1)*BytesPerPeriod;
-    bytePos += sizeof(REAL8) + NumSubcatch*NsubcatchResults*sizeof(REAL4);
+	static fpos_t existingBytePos;
+	static bool   simulationInProgress;
+
+	simulationInProgress = (NewRoutingTime < TotalDuration);		//2014-09-12:EMNET: iff the Simulation is still running, we must preserve the file position pointer
+	if (simulationInProgress) {
+		fgetpos(Fout.file, &existingBytePos);		//2014-09-11:EMNET: record current position in binary output file before we read from it
+	}
+
+	//2014-11-10:EMNET ---------- INT4 bytePos = OutputStartPos + (period - 1)*BytesPerPeriod;
+	fpos_t bytePos = (fpos_t)OutputStartPos + (fpos_t)(period - 1) * (fpos_t)BytesPerPeriod;		//2014-11-10:EMNET: use 8-byte integer arithmetic to handle over 2.1G
+
+	bytePos += sizeof(REAL8) + NumSubcatch*NsubcatchResults*sizeof(REAL4);
     bytePos += NumNodes*NnodeResults*sizeof(REAL4);
     bytePos += index*NlinkResults*sizeof(REAL4);
-    fseek(Fout.file, bytePos, SEEK_SET);
-    fread(LinkResults, sizeof(REAL4), NlinkResults, Fout.file);
+
+	//2014-11-10:EMNET --------- fseek(Fout.file, bytePos, SEEK_SET);
+	_fseeki64(Fout.file, bytePos, SEEK_SET);							//2014-11-10:EMNET: use _fseeki64 to handle over 2.1G
+
+	fread(LinkResults, sizeof(REAL4), NlinkResults, Fout.file);
     fread(SysResults, sizeof(REAL4), MAX_SYS_RESULTS, Fout.file);
+
+	if (simulationInProgress)  {
+		fsetpos(Fout.file, &existingBytePos);			//2014-09-11:EMNET: restore original position in binary output file
+	}
 }
 
 //=============================================================================

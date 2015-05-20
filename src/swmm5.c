@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   swmm5.c
 //
 //   Project:  EPA SWMM5
@@ -14,6 +34,8 @@
 //   a command line executable or through a series of calls made to functions
 //   in a dynamic link library.
 //
+//
+//
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
@@ -21,9 +43,12 @@
 //  Leave only one of the following 3 lines un-commented,
 //  depending on the choice of compilation target
 //**********************************************************
-//#define CLE     /* Compile as a command line executable */
+
+//2014-09-05:EMNET: compile sources as CONSOLE EXE, for testing -- so we can use the Development Environment for debugging
+
+#define CLE     /* Compile as a command line executable */			
 //#define SOL     /* Compile as a shared object library */
-#define DLL     /* Compile as a Windows DLL */
+//#define DLL     /* Compile as a Windows DLL */
 
 // --- define WINDOWS
 #undef WINDOWS
@@ -158,10 +183,19 @@ int  main(int argc, char *argv[])
         // --- extract file names from command line arguments
         inputFile = argv[1];
         reportFile = argv[2];
-        if (argc > 3) binaryFile = argv[3];
+
+		//EMNET: to debug with different INP and RPT files, you can either:
+		// A) Set your command-line arguments into   Project > Properties > Debugging > Command Arguments  (BE SURE TO CHOOSE "CONFIGURATION: DEBUG" FROM THE DROP-DOWN AT THE TOP!!!!!)
+		// - or -
+		// B) force the names into inputFile and reportFile (as below).
+		//////////writecon("REMOVE 2 LINES BELOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		////inputFile = "EmNetRTDSS_UseBothSALSPumps - 2013 March 17_001b.inp";
+		////reportFile = "EmNetRTDSS_UseBothSALSPumps - 2013 March 17_001b.rpt";
+
+
+		if (argc > 3) binaryFile = argv[3];
         else          binaryFile = blank;
         writecon(FMT02);
-
         // --- run SWMM
         swmm_run(inputFile, reportFile, binaryFile);
 
@@ -174,11 +208,13 @@ int  main(int argc, char *argv[])
         else                    writecon(FMT05);
     }
 
-// --- Use the code below if you need to keep the console window visible
-/* 
-    writecon("    Press Enter to continue...");
-    getchar();
-*/
+ 
+#ifdef CLE 
+	// --- Uncomment the code below if you need to keep the console window visible
+	// writecon("    EmNet SWMM has finished.  Press Enter to continue...");
+    // getchar();
+#endif
+
 
     return 0;
 }                                      /* End of main */
@@ -198,6 +234,9 @@ int DLLEXPORT  swmm_run(char* f1, char* f2, char* f3)
     long newHour, oldHour = 0;
     long theDay, theHour;
     DateTime elapsedTime = 0.0;
+
+	time_t simulation_Start;		//2014-09-12:EMNET
+	simulation_Start = time(0);		//2014-09-12:EMNET
 
     // --- open the files & read input data
     ErrorCode = 0;
@@ -230,6 +269,12 @@ int DLLEXPORT  swmm_run(char* f1, char* f2, char* f3)
             writecon("\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
                      "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b");
             writecon("Simulation complete           ");
+
+			// Display closing status on console
+			double simulationTime = difftime(time(0), simulation_Start);
+			sprintf(Msg, " ... EPA-SWMM SIMULATION completed in %.2f seconds.", simulationTime);
+			writecon(Msg);
+
         }
 
         // --- clean up
@@ -628,7 +673,7 @@ int  DLLEXPORT swmm_getVersion(void)
 
 double UCF(int u)
 //
-//  Input:   u = integer code of quantity being converted
+//  Input:   u = integer code of quantity being converetd
 //  Output:  returns a units conversion factor
 //  Purpose: computes a conversion factor from SWMM's internal
 //           units to user's units
@@ -690,8 +735,8 @@ char* getTempFileName(char* fname)
     // --- set dir to user's choice of a temporary directory
     if (strlen(TempDir) > 0)
     {
-        _mkdir(TempDir);
-	    dir = TempDir;
+	_mkdir(TempDir);
+	dir = TempDir;
     }
 
     // --- use _tempnam to get a pointer to an unused file name

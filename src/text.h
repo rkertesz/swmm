@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   text.h
 //
 //   Project: EPA SWMM5
@@ -16,7 +36,10 @@
 
 #define FMT01 \
  "\n Correct syntax is:\n swmm5 <input file> <report file> <output file>\n"
-#define FMT02 "\n... EPA-SWMM 5.1 (Build 5.1.007)\n"
+
+//EMNET ---- #define FMT02 "\n... EPA-SWMM 5.1 (Build 5.1.007)\n"
+#define FMT02 "\n... EPA-SWMM 5.1 (Build 5.1.007) ... With Controls Stack 1.03 [EmNet LLC]\n"		//2014-09-02:EMNET
+
 
 #define FMT03 " There are errors.\n"
 #define FMT04 " There are warnings.\n"

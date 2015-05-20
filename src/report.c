@@ -1,4 +1,24 @@
 //-----------------------------------------------------------------------------
+// This file is part of a modified version of EPA SWMM called ecSWMM.
+//
+//    ecSWMM is free software: you can redistribute it and/or modify
+//    it under the terms of the Lesser GNU Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//	
+//	  Portions of this software have not been changed from the original
+//	  source provided to public domain by EPA SWMM.
+//
+//    ecSWMM is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    Lesser GNU Public License for more details.
+//
+//    You should have received a copy of the Lesser GNU Public License
+//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+//    ecSWMM 5.1.007.03
+//-----------------------------------------------------------------------------
 //   report.c
 //
 //   Project:  EPA SWMM5
@@ -427,8 +447,9 @@ void   report_writeControlAction(DateTime aDate, char* linkID, double value,
     datetime_dateToStr(aDate, theDate);
     datetime_timeToStr(aDate, theTime);
     fprintf(Frpt.file,
-            "  %11s: %8s Link %s setting changed to %6.2f by Control %s\n",
-            theDate, theTime, linkID, value, ruleID);
+		//2014-09-22:EmNet ------------------- "  %11s: %8s Link %s setting changed to %6.2f by Control %s\n",
+		"  %11s: %8s Link %s setting changed to %7.3f by Control %s\n",			//2014-09-22:EmNet: display Control Actions with 3 decimal places, same as other data in the RPT file
+		theDate, theTime, linkID, value, ruleID);
 }
 
 
@@ -1346,6 +1367,30 @@ void report_writeInputErrorMsg(int k, int sect, char* line, long lineCount)
 //  Purpose: writes input error message to report file.
 //
 {
+	// **************************************************************
+	//2014-09-02: show error messages in Console, too:
+
+	char sMsg[1000] = { '\0' };
+	char sTemp[24] = { '\0' };
+
+	strcpy(sMsg, "\n\n******* Input File error: ");
+	strcat(sMsg, ErrString);
+	strcat(sMsg, " at line ");
+	//2014-09-08:EMNET ---- this does not work with the c++ compile option ------ _itoa(lineCount, sTemp, 10);
+	sprintf(sTemp, "%d", lineCount);
+	strcat(sMsg, sTemp);
+	if (sect >= 0) {
+		strcat(sMsg, " within Section ");
+		strcat(sMsg, SectWords[sect]);
+		strcat(sMsg, "]");
+	}
+	strcat(sMsg, ": ");
+	strcat(sMsg, line);
+	writecon(sMsg);			//NOTE: only in CLE mode does writecon() have any executable lines of code
+
+
+	// **************************************************************
+
     if ( Frpt.file )
     {
         report_writeErrorMsg(k, ErrString);
