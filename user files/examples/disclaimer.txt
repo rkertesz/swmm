@@ -1,0 +1,2 @@
+The examples are provided as-is.
+Any efforts made to utilize the examples for purposes other than learning and understanding the techniques and computational methods offered in ecSWMM is not permitted.

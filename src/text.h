@@ -1,21 +1,13 @@
 //-----------------------------------------------------------------------------
-// This file is part of a modified version of EPA SWMM called ecSWMM.
+// 	  This file is part of a modified version of EPA SWMM called ecSWMM with RPN 
+//    (reverse polish notation) control rules.
 //
-//    ecSWMM is free software: you can redistribute it and/or modify
-//    it under the terms of the Lesser GNU Public License as published by
-//    the Free Software Foundation, either version 3 of the License, or
-//    (at your option) any later version.
-//	
+//    ecSWMM is provided as free software: under the terms of the BSD free 
+//    software license included in the file repository. 
+//	  
 //	  Portions of this software have not been changed from the original
 //	  source provided to public domain by EPA SWMM.
 //
-//    ecSWMM is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    Lesser GNU Public License for more details.
-//
-//    You should have received a copy of the Lesser GNU Public License
-//    along with ecSWMM.  If not, see <http://www.gnu.org/licenses/>.
 //-----------------------------------------------------------------------------
 //    ecSWMM 5.1.007.03
 //-----------------------------------------------------------------------------
