@@ -350,7 +350,7 @@ THEN PUMP PUMP1 SETTING = 0.25 ; turn pump on at 25 %
 
 ;----------------------------------------------------------------
 ; Initialization
-RULE StartupInitializationSSO700
+RULE StartupInitialization
 IF SIMULATION TIME < 0.09 ; (hrs) Here we are setting up initial parameters at the beg of sim //ecSWMM
 THEN PUMP PUMP18@MyTank2-J3 SETTING = 0
 AND PUMP PUMP1 SETTING = 0
