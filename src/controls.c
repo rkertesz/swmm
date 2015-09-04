@@ -15,20 +15,66 @@
 //
 //   Project:  EPA SWMM5
 //   Version:  5.1
+<<<<<<< HEAD
 //   Date:     03/21/14 (Build 5.1.001) + EMNET additions (1.03)
 //				EMNET 1.03 -- use 8-byte file pointers to eliminate the effective 2.1G limitation on .out file.
 //				EMNET 1.02 -- correct compiler optimization issue for DLL.
 //				EMNET 1.01 -- add Stack Commands to Control section.
+=======
+//   Date:     03/21/14 (Build 5.1.001)
+//             03/19/15 (Build 5.1.008)
+//             04/30/15 (Build 5.1.009)
+//             08/05/15 (Build 5.1.010)
+>>>>>>> OpenWaterAnalytics/master
 //   Author:   L. Rossman
 //
 //   Rule-based controls functions.
+//
+//   Control rules have the format:
+//     RULE name
+//     IF <premise>
+//     AND / OR <premise>
+//     etc.
+//     THEN <action>
+//     AND  <action>
+//     etc.
+//     ELSE <action>
+//     AND  <action>
+//     etc.
+//     PRIORITY <p>
+//
+//   <premise> consists of:
+//      <variable> <relational operator> value / <variable>
+//   where <variable> is <object type> <id name> <attribute>
+//   E.g.: Node 123 Depth > 4.5
+//         Node 456 Depth < Node 123 Depth
+//
+//   <action> consists of:
+//      <variable> = setting
+//   E.g.: Pump abc status = OFF
+//         Weir xyz setting = 0.5
+//
+//  Build 5.1.008:
+//  - Support added for r.h.s. variables in rule premises.
+//  - Node volume added as a premise variable.
+//
+//  Build 5.1.009:
+//  - Fixed problem with parsing a RHS premise variable.
+//
+//  Build 5.1.010:
+//  - Support added for link TIMEOPEN & TIMECLOSED premises.
+//
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
+<<<<<<< HEAD
 #define MAX_STACK  1000			//2014-09-02:EMNET
 #define BIG_NUMBER 1e32			//2014-09-04:EMNET
 #define EPSILON    1e-20		//2014-09-04:EMNET
 
+=======
+#include <string.h>
+>>>>>>> OpenWaterAnalytics/master
 #include <malloc.h>
 #include <math.h>
 #include <string.h>				//2014-08-12:EMNET
@@ -37,6 +83,7 @@
 //-----------------------------------------------------------------------------
 //  Constants
 //-----------------------------------------------------------------------------
+<<<<<<< HEAD
 enum RuleState   {r_RULE, r_IF, r_AND, r_OR, r_THEN, r_ELSE, r_PRIORITY,
                   r_ERROR};
 enum RuleObject  {r_NODE, r_LINK, r_CONDUIT, r_PUMP, r_ORIFICE, r_WEIR,
@@ -64,39 +111,65 @@ const int r_PID3 = 104;						//2014-09-10:EMNET
 const int r_STACKRESULT_ACTION = 105;		//2014-08-28:EMNET
 const int r_NUMERIC = 106;
 
+=======
+enum RuleState    {r_RULE, r_IF, r_AND, r_OR, r_THEN, r_ELSE, r_PRIORITY,
+                   r_ERROR};
+enum RuleObject   {r_NODE, r_LINK, r_CONDUIT, r_PUMP, r_ORIFICE, r_WEIR,
+	               r_OUTLET, r_SIMULATION};
+enum RuleAttrib   {r_DEPTH, r_HEAD, r_VOLUME, r_INFLOW, r_FLOW, r_STATUS,      //(5.1.008)
+                   r_SETTING, r_TIMEOPEN, r_TIMECLOSED, r_TIME, r_DATE,        //(5.1.010)
+                   r_CLOCKTIME, r_DAY, r_MONTH};
+enum RuleRelation {EQ, NE, LT, LE, GT, GE};
+enum RuleSetting  {r_CURVE, r_TIMESERIES, r_PID, r_NUMERIC};
+>>>>>>> OpenWaterAnalytics/master
 
 static char* ObjectWords[] =
     {"NODE", "LINK", "CONDUIT", "PUMP", "ORIFICE", "WEIR", "OUTLET",
 	 "SIMULATION", "STACK", NULL};
 static char* AttribWords[] =
+<<<<<<< HEAD
     {"DEPTH", "HEAD", "INFLOW", "FLOW", "STATUS", "SETTING",
      "TIME", "DATE", "CLOCKTIME", "DAY", "MONTH", "RESULT", "OP", NULL};			//2014-08-28:EMNET: aded RESULT and OP for STACK object
 static char* OperandWords[] = { "=", "<>", "<", "<=", ">", ">=",
 "[ENTER]", "[POP]", "[+]", "[-]", "[*]", "[/]", "[y^x]", "[1/x]",
 "[CHS]", "[SWAP]", "[LOG10]", "[LN]", "[EXP]", "[SQRT]", "[SIN]", "[COS]", "[TAN]", "[ASIN]", "[ACOS]", "[ATAN]",
 "[X=Y]", "[X<>Y]", "[X>Y]", "[X>=Y]", "[X<Y]", "[X<=Y]", "[BACK]", NULL };
+=======
+    {"DEPTH", "HEAD", "VOLUME", "INFLOW", "FLOW", "STATUS", "SETTING",         //(5.1.008)
+     "TIMEOPEN", "TIMECLOSED","TIME", "DATE", "CLOCKTIME", "DAY", "MONTH",     //(5.1.010)
+     NULL};
+static char* RelOpWords[] = {"=", "<>", "<", "<=", ">", ">=", NULL};
+>>>>>>> OpenWaterAnalytics/master
 static char* StatusWords[]  = {"OFF", "ON", NULL};
 static char* ConduitWords[] = {"CLOSED", "OPEN", NULL};
 static char* SettingTypeWords[] = { "CURVE", "TIMESERIES", "PID", "PID2", "PID3", "STACK", NULL };		//2014-09-04:EMNET: added STACK RESULT as a SETTING type;  2014-09-10:PID2, PID3
 
 //-----------------------------------------------------------------------------                  
 // Data Structures
-//-----------------------------------------------------------------------------                  
+//-----------------------------------------------------------------------------
+// Rule Premise Variable
+struct TVariable
+{
+   int      node;            // index of a node (-1 if N/A)
+   int      link;            // index of a link (-1 if N/A)
+   int      attribute;       // type of attribute for node/link
+};
+
 // Rule Premise Clause 
 struct  TPremise
 {
-   int      type;
-   int      node;
-   int      link;
-   int      attribute;
-   int      operand;
-   double   value;
-   struct   TPremise *next;
+    int     type;                 // clause type (IF/AND/OR)
+    struct  TVariable lhsVar;     // left hand side variable                   //(5.1.008)
+    struct  TVariable rhsVar;     // right hand side variable                  //(5.1.008)
+    int     relation;             // relational operator (>, <, =, etc)
+    double  value;                // right hand side value
+    struct  TPremise *next;       // next premise clause of rule
 };
 
 // Rule Action Clause
 struct  TAction              
 {
+<<<<<<< HEAD
    int     rule;
    int     link;
    int     attribute;
@@ -106,6 +179,17 @@ struct  TAction
    double  kp, ki, kd;
    double  e1, e2, e3;			//2014-09-23:EMNET: added e3 for the PID3 derivative term
    struct  TAction *next;
+=======
+   int     rule;             // index of rule that action belongs to
+   int     link;             // index of link being controlled
+   int     attribute;        // attribute of link being controlled
+   int     curve;            // index of curve for modulated control
+   int     tseries;          // index of time series for modulated control
+   double  value;            // control setting for link attribute
+   double  kp, ki, kd;       // coeffs. for PID modulated control
+   double  e1, e2;           // PID set point error from previous time steps
+   struct  TAction *next;    // next action clause of rule
+>>>>>>> OpenWaterAnalytics/master
 };
 
 // List of Control Actions
@@ -119,22 +203,25 @@ struct  TActionList
 struct  TRule
 {
    char*    ID;                        // rule ID
-   double   priority;                  // Priority level
-   struct   TPremise* firstPremise;    // Pointer to first premise of rule
-   struct   TPremise* lastPremise;     // Pointer to last premise of rule
-   struct   TAction*  thenActions;     // Linked list of actions if true
-   struct   TAction*  elseActions;     // Linked list of actions if false
+   double   priority;                  // priority level
+   struct   TPremise* firstPremise;    // pointer to first premise of rule
+   struct   TPremise* lastPremise;     // pointer to last premise of rule
+   struct   TAction*  thenActions;     // linked list of actions if true
+   struct   TAction*  elseActions;     // linked list of actions if false
 };
 
 //-----------------------------------------------------------------------------
 //  Shared variables
 //-----------------------------------------------------------------------------
-struct TRule*       Rules;             // Array of control rules
-struct TActionList* ActionList;        // Linked list of control actions
-int    InputState;                     // State of rule interpreter
-int    RuleCount;                      // Total number of rules
-double ControlValue;                   // Value of controller variable
-double SetPoint;                       // Value of controller setpoint
+struct   TRule*       Rules;           // array of control rules
+struct   TActionList* ActionList;      // linked list of control actions
+int      InputState;                   // state of rule interpreter
+int      RuleCount;                    // total number of rules
+double   ControlValue;                 // value of controller variable
+double   SetPoint;                     // value of controller setpoint
+DateTime CurrentDate;                  // current date in whole days 
+DateTime CurrentTime;                  // current time of day (decimal)
+DateTime ElapsedTime;                  // elasped simulation time (decimal days)
 
 double Control_Stack[MAX_STACK] = { NAN };		//2014-09-02: EMNET CONTROL STACK VALUES
 int    Stack_Index;	      						//2014-09-02: EMNET CONTROL STACK INDEX: increments UP from 0
@@ -163,22 +250,29 @@ extern REAL4* LinkResults;             //  "
 //  Local functions
 //-----------------------------------------------------------------------------
 int    addPremise(int r, int type, char* Tok[], int nToks);
+int    getPremiseVariable(char* tok[], int* k, struct TVariable* v);
+int    getPremiseValue(char* token, int attrib, double* value);
 int    addAction(int r, char* Tok[], int nToks);
-int    evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
-                       DateTime elapsedTime, double tStep);
-int    checkTimeValue(struct TPremise* p, double tStart, double tStep);
-int    checkValue(struct TPremise* p, double x);
+
+int    evaluatePremise(struct TPremise* p, double tStep);
+double getVariableValue(struct TVariable v);
+int    compareTimes(double lhsValue, int relation, double rhsValue,
+       double halfStep);
+int    compareValues(double lhsValue, int relation, double rhsValue);
+
 void   updateActionList(struct TAction* a);
 int    executeActionList(DateTime currentTime);
 void   clearActionList(void);
 void   deleteActionList(void);
 void   deleteRules(void);
+
 int    findExactMatch(char *s, char *keyword[]);
 int    setActionSetting(char* tok[], int nToks, int* curve, int* tseries,
        int* attrib, double* value);
 void   updateActionValue(struct TAction* a, DateTime currentTime, double dt);
 double getPIDSetting(struct TAction* a, double dt);
 
+<<<<<<< HEAD
 double getPID2_Setting(struct TAction* a, double dt);
 double getPID3_Setting(struct TAction* a, double dt);
 
@@ -187,6 +281,8 @@ double Stack_Pop_value();
 void Clear_Stack();
 double Fetch_Stack_Operand(struct TPremise* p);
 
+=======
+>>>>>>> OpenWaterAnalytics/master
 //=============================================================================
 
 int  controls_create(int n)
@@ -300,8 +396,11 @@ int controls_evaluate(DateTime currentTime, DateTime elapsedTime, double tStep)
     int    result;                     // TRUE if rule premises satisfied
     struct TPremise* p;                // pointer to rule premise clause
     struct TAction*  a;                // pointer to rule action clause
-    DateTime theDate = floor(currentTime);
-    DateTime theTime = currentTime - floor(currentTime);
+
+    // --- save date and time to shared variables
+    CurrentDate = floor(currentTime);
+    CurrentTime = currentTime - floor(currentTime);
+    ElapsedTime = elapsedTime;
 
     // --- evaluate each rule
     if ( RuleCount == 0 ) return 0;
@@ -319,14 +418,12 @@ int controls_evaluate(DateTime currentTime, DateTime elapsedTime, double tStep)
             if ( p->type == r_OR )
             {
                 if ( result == FALSE )
-                    result = evaluatePremise(p, theDate, theTime,
-                                 elapsedTime, tStep);
+                    result = evaluatePremise(p, tStep);
             }
             else
             {
                 if ( result == FALSE ) break;
-                result = evaluatePremise(p, theDate, theTime, 
-                             elapsedTime, tStep);
+                result = evaluatePremise(p, tStep);
             }
             p = p->next;
         }    
@@ -350,6 +447,8 @@ int controls_evaluate(DateTime currentTime, DateTime elapsedTime, double tStep)
 
 //=============================================================================
 
+//  This function was revised to add support for r.h.s. premise variables. //  //(5.1.008)
+
 int  addPremise(int r, int type, char* tok[], int nToks)
 //
 //  Input:   r = control rule index
@@ -360,6 +459,7 @@ int  addPremise(int r, int type, char* tok[], int nToks)
 //  Purpose: adds a new premise to a control rule.
 //
 {
+<<<<<<< HEAD
 	int    node = -1;
 	int    link = -1;
 	int    obj, attrib, op, n;
@@ -526,12 +626,232 @@ int  addPremise(int r, int type, char* tok[], int nToks)
     if ( Rules[r].firstPremise == NULL )
     {
         Rules[r].firstPremise = p;
+=======
+    int    relation, n, err = 0;
+    double value = MISSING;
+    struct TPremise* p;
+    struct TVariable v1;
+    struct TVariable v2;
+
+    // --- check for minimum number of tokens
+    if ( nToks < 5 ) return ERR_ITEMS;
+
+    // --- get LHS variable
+    n = 1;
+    err = getPremiseVariable(tok, &n, &v1);
+    if ( err > 0 ) return err;
+
+    // --- get relational operator
+    n++;
+    relation = findExactMatch(tok[n], RelOpWords);
+    if ( relation < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
+    n++;
+
+    // --- initialize RHS variable
+    v2.attribute = -1;
+    v2.link = -1;
+    v2.node = -1;
+
+    // --- check that more tokens remain
+    if ( n >= nToks ) return error_setInpError(ERR_ITEMS, "");
+        
+    // --- see if a RHS variable is supplied
+    if ( findmatch(tok[n], ObjectWords) >= 0 && n + 3 >= nToks )
+    {
+        err = getPremiseVariable(tok, &n, &v2);
+        if ( err > 0 ) return ERR_RULE;                                        //(5.1.009)
+        if ( v1.attribute != v2.attribute)                                     //(5.1.009)
+            report_writeWarningMsg(WARN11, Rules[r].ID);                       //(5.1.009)
+    }
+
+    // --- otherwise get value to which LHS variable is compared to
+    else
+    {
+        err = getPremiseValue(tok[n], v1.attribute, &value);
+        n++;
+    }
+    if ( err > 0 ) return err;
+
+    // --- make sure another clause is not on same line
+    if ( n < nToks && findmatch(tok[n], RuleKeyWords) >= 0 ) return ERR_RULE;
+
+    // --- create the premise object
+    p = (struct TPremise *) malloc(sizeof(struct TPremise));
+    if ( !p ) return ERR_MEMORY;
+    p->type      = type;
+    p->lhsVar    = v1;
+    p->rhsVar    = v2;
+    p->relation  = relation;
+    p->value     = value;
+    p->next      = NULL;
+    if ( Rules[r].firstPremise == NULL )
+    {
+        Rules[r].firstPremise = p;
     }
     else
     {
         Rules[r].lastPremise->next = p;
     }
     Rules[r].lastPremise = p;
+    return 0;
+}
+
+//=============================================================================
+
+int getPremiseVariable(char* tok[], int* k, struct TVariable* v)
+//
+//  Input:   tok = array of string tokens containing premise statement
+//           k = index of current token
+//  Output:  returns an error code; updates k to new current token and
+//           places identity of specified variable in v
+//  Purpose: parses a variable (e.g., Node 123 Depth) specified in a
+//           premise clause of a control rule.
+//
+{
+    int    n = *k;
+    int    node = -1;
+    int    link = -1;
+    int    obj, attrib;
+
+    // --- get object type
+    obj = findmatch(tok[n], ObjectWords);
+    if ( obj < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
+
+    // --- get object index from its name
+    n++;
+    switch (obj)
+    {
+      case r_NODE:
+        node = project_findObject(NODE, tok[n]);
+        if ( node < 0 ) return error_setInpError(ERR_NAME, tok[n]);
+        break;
+
+      case r_LINK:
+      case r_CONDUIT:
+      case r_PUMP:
+      case r_ORIFICE:
+      case r_WEIR:
+      case r_OUTLET:
+        link = project_findObject(LINK, tok[n]);
+        if ( link < 0 ) return error_setInpError(ERR_NAME, tok[n]);
+        break;
+      default: n--;
+    }
+    n++;
+
+    // --- get attribute index from its name
+    attrib = findmatch(tok[n], AttribWords);
+    if ( attrib < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
+
+    // --- check that attribute belongs to object type
+    if ( obj == r_NODE ) switch (attrib)
+    {
+      case r_DEPTH:
+      case r_HEAD:
+      case r_VOLUME:                                                           //(5.1.008)
+      case r_INFLOW: break;
+      default: return error_setInpError(ERR_KEYWORD, tok[n]);
+    }
+
+////  Added to release 5.1.010.  ////                                          //(5.1.010)
+    // --- check for link TIMEOPEN & TIMECLOSED attributes
+    else if ( link >= 0  &&
+            ( (attrib == r_TIMEOPEN ||
+               attrib == r_TIMECLOSED)
+            ))
+    {
+ 
+    }
+////
+
+    else if ( obj == r_LINK || obj == r_CONDUIT ) switch (attrib)
+    {
+      case r_STATUS:
+      case r_DEPTH:
+      case r_FLOW: break;
+      default: return error_setInpError(ERR_KEYWORD, tok[n]);
+    }
+    else if ( obj == r_PUMP ) switch (attrib)
+    {
+      case r_FLOW:
+      case r_STATUS: break;
+      default: return error_setInpError(ERR_KEYWORD, tok[n]);
+    }
+    else if ( obj == r_ORIFICE || obj == r_WEIR ||
+              obj == r_OUTLET ) switch (attrib)
+    {
+      case r_SETTING: break;
+      default: return error_setInpError(ERR_KEYWORD, tok[n]);
+    }
+    else switch (attrib)
+    {
+      case r_TIME:
+      case r_DATE:
+      case r_CLOCKTIME:
+      case r_DAY:
+      case r_MONTH: break;
+      default: return error_setInpError(ERR_KEYWORD, tok[n]);
+    }
+
+    // --- populate variable structure
+    v->node      = node;
+    v->link      = link;
+    v->attribute = attrib;
+    *k = n;
+    return 0;
+}
+
+//=============================================================================
+
+int getPremiseValue(char* token, int attrib, double* value)
+//
+//  Input:   token = a string token
+//           attrib = index of a node/link attribute
+//  Output:  value = attribute value;
+//           returns an error code;
+//  Purpose: parses the numerical value of a particular node/link attribute
+//           in the premise clause of a control rule.
+//
+{
+    switch (attrib)
+    {
+      case r_STATUS:
+        *value = findmatch(token, StatusWords);
+		if ( *value < 0.0 ) *value = findmatch(token, ConduitWords);
+        if ( *value < 0.0 ) return error_setInpError(ERR_KEYWORD, token);
+        break;
+
+      case r_TIME:
+      case r_CLOCKTIME:
+      case r_TIMEOPEN:                                                         //(5.1.010)
+      case r_TIMECLOSED:                                                       //(5.1.010)
+        if ( !datetime_strToTime(token, value) )
+            return error_setInpError(ERR_DATETIME, token);
+        break;
+
+      case r_DATE:
+        if ( !datetime_strToDate(token, value) )
+            return error_setInpError(ERR_DATETIME, token);
+        break;
+
+      case r_DAY:
+        if ( !getDouble(token, value) ) 
+            return error_setInpError(ERR_NUMBER, token);
+        if ( *value < 1.0 || *value > 7.0 )
+             return error_setInpError(ERR_DATETIME, token);
+        break;
+
+      case r_MONTH:
+        if ( !getDouble(token, value) )
+            return error_setInpError(ERR_NUMBER, token);
+        if ( *value < 1.0 || *value > 12.0 )
+             return error_setInpError(ERR_DATETIME, token);
+        break;
+       
+      default: if ( !getDouble(token, value) )
+          return error_setInpError(ERR_NUMBER, token);
+>>>>>>> OpenWaterAnalytics/master
+    }
     return 0;
 }
 
@@ -1065,6 +1385,7 @@ int executeActionList(DateTime currentTime)
 
 //=============================================================================
 
+<<<<<<< HEAD
 int evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
 	DateTime elapsedTime, double tStep)
 	//
@@ -1193,53 +1514,92 @@ int evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
 
 
 
+=======
+int evaluatePremise(struct TPremise* p, double tStep)
+//
+//  Input:   p = a control rule premise condition
+//           tStep = current time step (days)
+//  Output:  returns TRUE if the condition is true or FALSE otherwise
+//  Purpose: evaluates the truth of a control rule premise condition.
+//
+{
+    double lhsValue, rhsValue;
+>>>>>>> OpenWaterAnalytics/master
 
-    switch ( p->attribute )
+    lhsValue = getVariableValue(p->lhsVar);
+    if ( p->value == MISSING ) rhsValue = getVariableValue(p->rhsVar);         //(5.1.008)
+    else                       rhsValue = p->value;                            //(5.1.008)
+    if ( lhsValue == MISSING || rhsValue == MISSING ) return FALSE;
+    switch (p->lhsVar.attribute)
     {
+    case r_TIME:
+    case r_CLOCKTIME:
+    case r_TIMEOPEN:                                                           //(5.1.010)
+    case r_TIMECLOSED:                                                         //(5.1.010)
+        return compareTimes(lhsValue, p->relation, rhsValue, tStep/2.0); 
+    default:
+        return compareValues(lhsValue, p->relation, rhsValue);
+    }
+}
+
+//=============================================================================
+
+double getVariableValue(struct TVariable v)
+{
+    int i = v.node;
+    int j = v.link;
+
+    switch ( v.attribute )
+    {
+<<<<<<< HEAD
 	  case r_TIME:
         return checkTimeValue(p, elapsedTime, tStep/2.0);
+=======
+      case r_TIME:
+        return ElapsedTime;
+>>>>>>> OpenWaterAnalytics/master
         
       case r_DATE:
-        return checkValue(p, theDate);
+        return CurrentDate;
 
       case r_CLOCKTIME:
-        return checkTimeValue(p, theTime, tStep/2.0);
+        return CurrentTime;
 
       case r_DAY:
-        return checkValue(p, datetime_dayOfWeek(theDate));
+        return datetime_dayOfWeek(CurrentDate);
 
       case r_MONTH:
-        return checkValue(p, datetime_monthOfYear(theDate));
+        return datetime_monthOfYear(CurrentDate);
 
       case r_STATUS:
         if ( j < 0 ||
-            (Link[j].type != CONDUIT && Link[j].type != PUMP) ) return FALSE;
-        else return checkValue(p, Link[j].setting);
+            (Link[j].type != CONDUIT && Link[j].type != PUMP) ) return MISSING;
+        else return Link[j].setting;
         
       case r_SETTING:
         if ( j < 0 || (Link[j].type != ORIFICE && Link[j].type != WEIR) )
-            return FALSE;
-        else return checkValue(p, Link[j].setting);
+            return MISSING;
+        else return Link[j].setting;
 
       case r_FLOW:
-        if ( j < 0 ) return FALSE;
-        else return checkValue(p, Link[j].direction*Link[j].newFlow*UCF(FLOW));
+        if ( j < 0 ) return MISSING;
+        else return Link[j].direction*Link[j].newFlow*UCF(FLOW);
 
       case r_DEPTH:
-        if ( j >= 0 ) return checkValue(p, Link[j].newDepth*UCF(LENGTH));
+        if ( j >= 0 ) return Link[j].newDepth*UCF(LENGTH);
         else if ( i >= 0 )
-            return checkValue(p, Node[i].newDepth*UCF(LENGTH));
-        else return FALSE;
+            return Node[i].newDepth*UCF(LENGTH);
+        else return MISSING;
 
       case r_HEAD:
-        if ( i < 0 ) return FALSE;
-        head = (Node[i].newDepth + Node[i].invertElev) * UCF(LENGTH);
-        return checkValue(p, head);
+        if ( i < 0 ) return MISSING;
+        return (Node[i].newDepth + Node[i].invertElev) * UCF(LENGTH);
 
-      case r_INFLOW:
-        if ( i < 0 ) return FALSE;
-        else return checkValue(p, Node[i].newLatFlow*UCF(FLOW));
+      case r_VOLUME:                                                           //(5.1.008)
+        if ( i < 0 ) return MISSING;
+        return (Node[i].newVolume * UCF(VOLUME));
 
+<<<<<<< HEAD
 	  case r_STACK_RESULT:
 		  return checkValue(p,Control_Stack[Stack_Index]);				//2014-09-02:EMNET: COMPARE premise value with current TOP-of-STACK -- or PERFORM STACK OPERATION
 
@@ -1253,37 +1613,58 @@ int evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
 		  }
 
       default: return FALSE;
+=======
+      case r_INFLOW:
+        if ( i < 0 ) return MISSING;
+        else return Node[i].newLatFlow*UCF(FLOW);
+
+////  This section added to release 5.1.010.  ////                             //(5.1.010)
+      case r_TIMEOPEN:
+          if ( j < 0 ) return MISSING;
+          if ( Link[j].setting <= 0.0 ) return MISSING;
+          return CurrentDate + CurrentTime - Link[j].timeLastSet;
+
+      case r_TIMECLOSED:
+          if ( j < 0 ) return MISSING;
+          if ( Link[j].setting > 0.0 ) return MISSING;
+          return CurrentDate + CurrentTime - Link[j].timeLastSet;
+////
+
+      default: return MISSING;
+>>>>>>> OpenWaterAnalytics/master
     }
 }
 
 //=============================================================================
 
-int checkTimeValue(struct TPremise* p, double tStart, double halfStep)
+int compareTimes(double lhsValue, int relation, double rhsValue, double halfStep)
 //
-//  Input:   p = control rule premise condition
-//           tStart = time of day or elapsed time at start of current time step
+//  Input:   lhsValue = date/time value on left hand side of relation
+//           relation = relational operator code (see RuleRelation enumeration)
+//           rhsValue = date/time value on right hand side of relation 
 //           halfStep = 1/2 the current time step (days)
-//  Output:  returns TRUE if time condition is satisfied
-//  Purpose: evaluates the truth of a condition involving time.
+//  Output:  returns TRUE if time relation is satisfied
+//  Purpose: evaluates the truth of a relation between two date/times.
 //
 {
-    if ( p->operand == EQ )
+    if ( relation == EQ )
     {
-        if ( p->value >= tStart - halfStep
-        &&   p->value < tStart + halfStep ) return TRUE;
+        if ( lhsValue >= rhsValue - halfStep
+        &&   lhsValue < rhsValue + halfStep ) return TRUE;
         return FALSE;
     }
-    else if ( p->operand == NE )
+    else if ( relation == NE )
     {
-        if ( p->value < tStart - halfStep
-        ||   p->value >= tStart + halfStep ) return TRUE;
+        if ( lhsValue < rhsValue - halfStep
+        ||   lhsValue >= rhsValue + halfStep ) return TRUE;
         return FALSE;
     }
-    else return checkValue(p, tStart);
+    else return compareValues(lhsValue, relation, rhsValue);
 }
 
 //=============================================================================
 
+<<<<<<< HEAD
 int checkValue(struct TPremise* p, double x)
 //
 //  Input:   p = control rule premise condition
@@ -1529,6 +1910,26 @@ int checkValue(struct TPremise* p, double x)
 
 
 	}
+=======
+int compareValues(double lhsValue, int relation, double rhsValue)
+//  Input:   lhsValue = value on left hand side of relation
+//           relation = relational operator code (see RuleRelation enumeration)
+//           rhsValue = value on right hand side of relation 
+//  Output:  returns TRUE if relation is satisfied
+//  Purpose: evaluates the truth of a relation between two values.
+{
+    SetPoint = rhsValue;
+    ControlValue = lhsValue;
+    switch (relation)
+    {
+      case EQ: if ( lhsValue == rhsValue ) return TRUE; break;
+      case NE: if ( lhsValue != rhsValue ) return TRUE; break;
+      case LT: if ( lhsValue <  rhsValue ) return TRUE; break;
+      case LE: if ( lhsValue <= rhsValue ) return TRUE; break;
+      case GT: if ( lhsValue >  rhsValue ) return TRUE; break;
+      case GE: if ( lhsValue >= rhsValue ) return TRUE; break;
+    }
+>>>>>>> OpenWaterAnalytics/master
     return FALSE;
 }
 
