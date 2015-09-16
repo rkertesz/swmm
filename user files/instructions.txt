@@ -1,0 +1,204 @@
+**************ecSWMM User Help File******************
+*****************************************************
+
+#Type of Software Asset 
+Stand-alone Windows application program (or linkable DLL), written in straight 'C' code. 
+
+----------------------------------------------------------------
+#Description / Intended Use 
+Storm Water Management Model from EPA, with original modifications by EmNet employees to allow more-complicated controls. Open sourced to the web for further development. 
+
+----------------------------------------------------------------
+#History 
+An older version required writing custom 'C' code to be semi-automatically pulled into a Visual Studio project and compiled into a new SWMM executable. It had problems executing after Windows XP, because of the way it copied files into the \Program Files folder (as well as other difficulties, like hard-coded folder locations for various files). This older version was based on EPA SWMM 5.0 sources and compiled with Visual Studio 2008. It was successfully tested with Visual Studio 2013, but is currently retired. 
+The newer version of this test SWMM dll (source code to be released soon) allows defining and editing custom controls without requiring A) the custom 'C' code, nor B) the rebuild of the SWMM EXE. The newer version offers many more options for the Rules in the [Controls] section of the SWMM .INP file. Those Rules may be edited through the SWMM UI, or by using any text editor on the .INP file. In particular, complex equations may be entered -- but in one-step at a time, RPN notation (like an older HP scientific calculator). This yields the flexibility to solve complex equations within EPA SWMM's internal structure for storing and solving Rules. This newer version is based on EPA SWMM 5.1 sources and compiled with Visual Studio 2013. 
+
+----------------------------------------------------------------
+#Compilation Instructions 
+Within module swmm5.c, choose Command Line Executable (with a Console Window) or DLL. This is the compute-engine section of EPA SWMM without the UI. When compiled to a DLL, it can be used with the EXE (the UI). 
+Be sure to CLEAN and then BUILD after changing CLE to DLL, and vice versa. 
+//**********************************************************
+//  Leave only one of the following 3 lines un-commented,
+//  depending on the choice of compilation target
+//**********************************************************
+
+//2014-09-05: compile sources as CONSOLE EXE, for testing -- so we can use the Development Environment for debugging
+
+#define CLE       /* Compile as a command line executable */	
+//#define SOL     /* Compile as a shared object library */
+//#define DLL     /* Compile as a Windows DLL */
+Source code changes from the canonical EPA SWMM 5.1 sources are marked with commentary like //2014-08-14: testSWMM (on either a block basis or line-by-line) 
+
+----------------------------------------------------------------
+#Installation Instructions 
+Do the normal installation for EPA SWMM 5.1. 
+Copy swmm5.dll from the project /Release subfolder into the EPA SWMM executable folder. Rename the original (EPA issued) swmm5.dll to be swmm5_OLD.dll. Run SWMM. 
+
+----------------------------------------------------------------
+#Configuration Instructions and Example 
+Normal EPA SWMM configuration applies. A model must be developed and specified, and rain data must be provided. 
+All the existing documentation for RULES still applies, with the following additions in this test SWMM file (ecSWMM). 
+All Rules are checked for syntax errors in SWMM's normal fashion, with any syntax errors reported on-screen (in the Console EXE version) and in the Report file. 
+Each premise of the rule has the same syntax as the original rule set: 
+KEYWORD ... OBJECT ... ATTRIBUTE ... OPERAND ... VALUE 
+
+KEYWORD from this list [IF|AND|OR]
+OBJECT from this list [NODE|LINK|PUMP|CONDUIT|ORIFICE|WEIR|OUTLET|SIMULATION|STACK]
+ATTRIBUTE from this list [DEPTH|FLOW|HEAD|INFLOW|STATUS|SETTING|TIME|DATE|CLOCKTIME|DAY|MONTH|RESULT|OP]
+OPERAND from this list [=|>|<|<=|>=|<>] plus all the STACK OPERANDS: [ENTER]|[+]|[-]|[*]|[/]|[^]|[X>Y] etc. (see list of Stack Commands below)
+VALUE from this list [(number)|---]
+
+Typically, each rule will end with a boolean operation at the end of the rule premise. Should there be more than 1 boolean operation, the last one prevails. Here is a sample rule with a few of the new options. In documentation, (X) refers to the value in the Top-of-Stack and (Y) is the value just below the top. Equations are specified in RPN notation (like an older HP scientific calculator). See Wikipedia: Reverse Polish Notation 
+
+RULE Stacktest_Compare			;name of the Rule
+IF STACK OP [Enter] 112.3		;push a constant value of 112.3 onto the stack
+AND STACK OP [Enter] 2.1		;push a constant value of 2.1 onto the stack
+AND STACK OP [+] ---			;add (Y) to (X), pop the stack twice, and push the result onto the stack
+AND STACK OP [Enter] 500.00		;push a constant value 500.0 onto the stack
+AND STACK OP [/] ---			;divide (Y) by (X) (divide prior result by 500.0), pop the stack twice, and push result onto the stack
+AND NODE o1 INFLOW [Enter] ---		;push the value for "Node o1 INFLOW" (at current simulation step) onto the stack.
+AND STACK OP [X>Y] ---			;if (X) is greater than (Y), return TRUE
+THEN PUMP P1 STATUS = ON 		;part 1 of TRUE clause
+AND PUMP P1 SETTING = STACK RESULT	;part 2 of TRUE clause [using "AND" to make a multi-part THEN/ELSE is a normal part of SWMM Controls]
+ELSE PUMP P1 STATUS = OFF		;FALSE clause
+
+Another example, using the SIMULATION TIME value: 
+
+RULE Stacktest_SimulationTime 
+IF SIMULATION TIME [Enter] ---
+AND STACK OP [Enter] 1440.0              ;convert TIME value to Minutes by multiplying by 1440 (24 * 60)
+AND STACK OP [*] ---
+AND STACK RESULT > 200.0                 ;comparison of STACK RESULT to a constant; just use the regular > operator
+THEN PUMP P1 STATUS = ON 
+AND PUMP P1 SETTING = STACK RESULT       ;set the PUMP SETTING to the STACK RESULT, as a test
+ELSE PUMP P1 STATUS = OFF
+
+Important notes: 
+1.	You can use any SWMM object (like Node, Link, or Pump) on the left side of an [Enter] commmand. This picks up the value for that Flow, Depth, etc. at the current simulation step and puts the simulated value onto the stack (into your equation and logic).
+2.	You can set the PUMP SETTING to the result of your equation by using "STACK RESULT" on the right-side of the equal-sign in an Action clause.
+
+For debugging a control equation, it is useful to set the STACK RESULT into a pump setting. Then you can view the computed values in the Report file, in the "Control Actions Taken" section. 
+
+IMPORTANT NOTE: You need to add CONTROLS YES to the [REPORT] section of your .INP file, in order to get the “Control Actions Taken” section to appear in the Report file. 
+
+[REPORT]
+;;Reporting Options
+INPUT      YES
+CONTROLS   YES
+SUBCATCHMENTS ALL
+NODES ALL
+LINKS ALL
+
+Note that "Control Actions Taken" only lists changes to the control setting. The displayed value remains in force until the next change. 
+
+*********************
+Control Actions Taken
+*********************
+  JAN-01-2007: 00:00:30 Link P1 setting changed to  10.000 by Control Stacktest_BACK4by4
+  JAN-01-2007: 00:03:00 Link P1 setting changed to 100.000 by Control Stacktest_BACK4by4
+  JAN-01-2007: 00:07:30 Link P1 setting changed to 1000.000 by Control Stacktest_BACK4by4
+  JAN-01-2007: 00:12:00 Link P1 setting changed to 10000.000 by Control Stacktest_BACK4by4
+  JAN-01-2007: 00:35:15 Link P1 setting changed to   0.000 by Control Stacktest_BACK4by4
+
+---------------------------------------------------------------
+#Stack Commands 
+Comparison commands return a TRUE or FALSE, and that returned value gets used in the normal SWMM Rule logic processing for AND/OR statements. Normally, an equation will be a series of ANDs (with an IF for the first line). Calculation commands always return a TRUE (unless there are insufficient entries on the stack for the command). Then a FALSE is returned. Nomenclature: (X) refers to the value at the Top-of-Stack. (Y) refers to the value just below top-of-stack. 
+
+[Enter] 	Push a value onto the stack. Samples: "STACK OP [Enter] 123.45" pushes a constant onto the stack. "Node o1 INFLOW [Enter] ---" pushes a simulation value onto the stack. 
+[+] 	Perform (Y) plus (X). Pop stack twice, push result onto top-of-stack. 
+[–] 	Perform (Y) minus (X). Pop stack twice, push result onto top-of-stack. 
+[*] 	Perform (Y) times (X). Pop stack twice, push result onto top-of-stack. 
+[/] Perform (Y) divided by (X). Pop stack twice, push result onto top-of-stack. 
+[y^x] 	Perform (Y) to the (X) power. Pop stack twice, push result onto top-of-stack. 
+[1/x] 	Perform (1/X) and replace top-of-stack with that result. [Returns] 
+[CHS] 	Change sign of (X) and replace top-of-stack with that result. 
+[LOG10] 	Take the Log base 10 of (X) and replace top-of-stack with that result. [Returns] 
+[LN] 	Take the Natural Log of (X) and replace top-of-stack with that result. [Returns] 
+[EXP] 	Take 'e' to the power (X) and replace top-of-stack with that result. 
+[SQRT] 	Take square root of (X) and replace top-of-stack with that result. [Produces] 
+[SIN] 	Take sine(X) and replace top-of-stack with that result. [(X)] 
+[COS] 	Take cosine(X) and replace top-of-stack with that result. [(X)] 
+[TAN] 	Take tangent(X) and replace top-of-stack with that result. [(X)] 
+[ASIN] 	Compute arcsine(X) and replace top-of-stack with that result. [Result] Returns 1e32 if (X) 1.0. 
+[ACOS] 	Compute arccosine(X) and replace top-of-stack with that result. [Result] Returns 1e32 if (X) 1.0. 
+[ATAN] 	Compute arctangent(X) and replace top-of-stack with that result. [Result] 
+[X=Y] 	Compare (X) and (Y), returning TRUE iff they are within 1e-20 of each other. Stack is not changed. TRUE/FALSE is processed by SWMM Rule Logic. 
+[XY] 	Compare (X) and (Y), returning TRUE iff they are NOT within 1e-20 of each other. Stack is not changed. TRUE/FALSE is processed by SWMM Rule Logic. 
+[X>Y] 	Compare (X) and (Y), returning TRUE iff (X) > (Y). Stack is not changed. TRUE/FALSE is processed by SWMM Rule Logic. 
+[X>=Y] 	Compare (X) and (Y), returning TRUE iff (X) >= (Y). Stack is not changed. TRUE/FALSE is processed by SWMM Rule Logic. 
+[X	Compare (X) and (Y), returning TRUE iff (X) 
+[X	Compare (X) and (Y), returning TRUE iff (X) 
+[POP] 	Pop the stack once [disposing]. 
+[SWAP] 	Swap X and Y. 
+
+@@@@@@@@@@@@@@@****[BACK] Command****@@@@@@@@@@@@@@
+
+The [BACK] command is a stack command that will push a prior value of certain system variables onto the Stack. This allows you to set up feedback Control Rules based on the prior values of those system variables. 
+In the list below, sss.s represents a floating-point number for how many seconds to go back for a prior value. Prior values are only available at the REPORT_STEP time increments (every 15 seconds, if that is what REPORT_STEP is set to). However, the sss.s that you specify does not have to be a multiple of REPORT_STEP. The [BACK] command will automatically scale your sss.s seconds specification into the closest number of "report steps" backwards in the simulation. Thus, if someone changes the REPORT_STEP to a different time value, that change does not wreck your control strategy (because your feedback is based upon a number of seconds, not directly on the number of report steps.) 
+
+As currently implemented, you can go back as many seconds as you wish, as far back as the start of simulation. If you try to go back farther than that, the [BACK] function returns a FALSE and your ELSE clause will need to handle any settings that must be set. For instance, if you have a [BACK] 60.0, a FALSE will be returned until the simulation elapsed time exceeds the 60-second mark. 
+
+Items that DO work with [BACK] function: 
+1.	LINK commands:
+	LINK nnn FLOW [BACK] sss.s
+	LINK nnn DEPTH [BACK] sss.s
+2.	PUMP commands:
+	PUMP nnn FLOW [BACK] sss.s
+	LINK nnn DEPTH [BACK] sss.ss --- "LINK nnn DEPTH" works even when nnn is a pump!
+3.	NODE commands:
+	NODE nnn DEPTH [BACK] sss.s
+	NODE nnn HEAD [BACK] sss.s
+	NODE nnn INFLOW [BACK] sss.s
+4.	TIME commands:
+	SIMULATION TIME [BACK] sss.s (elapsed total simulation time)
+	SIMULATION CLOCKTIME [BACK] sss.s (time-of-day only, on current day of simulation)
+
+Items that do NOT work with [BACK] function: 
+1.	XXXX -- PUMP STATUS ... because STATUS accepts only ON or OFF as argument, not a number sss.s (so we cannot specify the # of seconds to look BACK). A program change could allow numbers, if PUMP STATUS [BACK] is really needed.
+2.	XXXX -- PUMP SETTING ... because standard EPA rule syntax for rule premises does not allows SETTING as an argument. A program change "should" allow PUMP SETTING [BACK] sss.s if it is really needed. (Note it "looks" like Pump Setting is stored in the LINK_CAPACITY parameter in the RPT datasets. This will need to be checked out, if the program change is to be made.)
+3.	XXXX -- NODE VOLUME, NODE LATFLOW, NODE OVERFLOW -- these are in the RPT dataset and accessible, but there are no keywords for them in standard EPA rule syntax.
+4.	XXXX -- LINK VELOCITY, LINK VOLUME, LINK CAPACITY, LINK QUAL -- these are in the RPT dataset and accessible, but there are no keywords for them in standard EPA rule syntax.
+5.	XXXX -- SUBCATCHMENT ... not even part of EPA SWMM CONTROLS syntax. But subcatchments do have these values recorded (and could work with [BACK], with program changes):
+	XXXX -- SUBCATCH_RAINFALL
+	XXXX -- SUBCATCH_EVAP
+	XXXX -- SUBCATCH_INFIL
+	XXXX -- SUBCATCH_RUNOFF
+	XXXX -- SUBCATCH_SNOWDEPTH
+	XXXX -- SUBCATCH_GW_ELEV
+	XXXX -- SUBCATCH_GW_FLOW
+	XXXX -- SUBCATCH_WASHOFF+p
+
+@@@@@@@@@@@@@@@@2****PID2 and PID3****@@@@@@@@@@@@@@@@
+The original EPA PID uses the proportionality constant in all 3 terms (standard PID format): kp * (p + i + d); 
+EmNet PID2 uses the proportionality constant only in the proportional term (ideal PID format): (kp * p) + i + d 
+EmNet PID3 has two changes: 
+1.	uses the proportionality constant only in the proportional term (ideal PID format): (kp * p) + i + d
+2.	expands the derivative term to include error(t-3).
+Derivative Terms: 
+PID and PID2 use the original EPA setup for the deriviative term, using error terms e(t), e(t-1), e(t-2): 
+d &#61; kd &#42; (e0 &#45; 2.0&#42;e1 + e2) / dt 
+PID3 uses different coefficients and also includes e(t-3): 
+d &#61; kd &#42; (e0 &#45; ((3.0&#42;e1) &#45; (2.0&#42;e2) &#45; (1.0&#42;e3))) / dt 
+
+See ----> Ideal versus standard PID form at the following link: 
+http://en.wikipedia.org/wiki/PID_controller#Ideal_versus_standard_PID_form
+
+----------------------------------------------------------------
+#Future Enhancements (TO-DO) 
+1.	Add [Store] and [Recall] stack commands, using Registers R1 through R9.
+2.	Allow Register values to be retained from Rule to Rule. (The Stack itself is cleared at the start of each new Simulation Step, and at the start of evaluation of each new Rule.)
+3.	Build or find a utility program to convert algebraic-format equations to Rule-format RPN.
+4.	Add an operand to STACK like the RESULT operand, but use the second item on the stack. Perhaps just go with STACK XVALUE and STACK YVALUE instead of STACK RESULT.
+5.	Add a command like [setCV]. Example: STACK RESULT [setCV] which would set the internal SWMM ControlValue variable to the STACK RESULT. Then the PID command will operate with that computed result, not the object-and-attribute named in the last condition clause of the rule.
+
+----------------------------------------------------------------
+#Revisions 
+5.1.007.03 
+Release number 5.1.007.03 //First Public Release This publication of the source code aligns with internal revision EmNet 1.03. 
+Notable changes to the standard EPA SWMM release 5.1.007 
+1.	added RPN Stack Commands to Controls section.
+2.	use 8-byte file pointer to eliminate the effective 2.1G limitation on.out file.
+3.	BACK command to use results from prior steps in simulation to provide feedback loops in controls.
+4.	small mods to allow compiling with Microsoft Visual Studio (2013).
+5.	added offset of 100 to RuleSetting constants to keep them separate from RuleAttribute constants.
+The RPN stack commands allow for more complex control rules. Commands written for existing SWMM simulations do not require changes, however this release also allows for stack commands using reverse polish notation to allow for computations and logical decisions that are not otherwise possible. Some examples of stack commands are shown in the wiki.
