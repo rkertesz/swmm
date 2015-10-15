@@ -9,7 +9,7 @@
 //	  source provided to public domain by EPA SWMM.
 //
 //-----------------------------------------------------------------------------
-//    ecSWMM 5.1.007.03
+//    ecSWMM 5.1.010
 //-----------------------------------------------------------------------------
 //   swmm5.c
 //
@@ -28,14 +28,11 @@
 //   in a dynamic link library.
 //
 //
-<<<<<<< HEAD
-=======
 //   Build 5.1.008:
 //   - Support added for the MinGW compiler.
 //   - Reporting of project options moved to swmm_start. 
 //   - Hot start file now read before routing system opened.
 //   - Final routing step adjusted so that total duration not exceeded.
->>>>>>> OpenWaterAnalytics/master
 //
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
@@ -204,13 +201,14 @@ int  main(int argc, char *argv[])
 		// - or -
 		// B) force the names into inputFile and reportFile (as below).
 		//////////writecon("REMOVE 2 LINES BELOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-		////inputFile = "EmNetRTDSS_UseBothSALSPumps - 2013 March 17_001b.inp";
-		////reportFile = "EmNetRTDSS_UseBothSALSPumps - 2013 March 17_001b.rpt";
+		////inputFile = "RTDSS_example.inp";
+		////reportFile = "RTDSS_example.rpt";
 
 
 		if (argc > 3) binaryFile = argv[3];
         else          binaryFile = blank;
         writecon(FMT02);
+		
         // --- run SWMM
         swmm_run(inputFile, reportFile, binaryFile);
 
@@ -223,13 +221,13 @@ int  main(int argc, char *argv[])
         else                    writecon(FMT05);
     }
 
- 
-#ifdef CLE 
-	// --- Uncomment the code below if you need to keep the console window visible
-	// writecon("    EmNet SWMM has finished.  Press Enter to continue...");
-    // getchar();
-#endif
-
+// Following is closer to new version of EPASWMM ///RK 
+// --- Use the code below if you need to keep the console window visible
+/* 
+	writecon("    EmNet SWMM has finished.  Press Enter to continue...");  // EmNet 9-9-2015
+    //writecon("    Press Enter to continue...");
+    getchar();
+*/
 
     return 0;
 }                                      /* End of main */
@@ -702,7 +700,7 @@ int  DLLEXPORT swmm_getVersion(void)
 
 double UCF(int u)
 //
-//  Input:   u = integer code of quantity being converetd
+//  Input:   u = integer code of quantity being converted
 //  Output:  returns a units conversion factor
 //  Purpose: computes a conversion factor from SWMM's internal
 //           units to user's units
@@ -764,14 +762,9 @@ char* getTempFileName(char* fname)
     // --- set dir to user's choice of a temporary directory
     if (strlen(TempDir) > 0)
     {
-<<<<<<< HEAD
-	_mkdir(TempDir);
-	dir = TempDir;
-=======
         _mkdir(TempDir);
         dir = TempDir;
->>>>>>> OpenWaterAnalytics/master
-    }
+	}
 
     // --- use _tempnam to get a pointer to an unused file name
     name = _tempnam(dir, "swmm");

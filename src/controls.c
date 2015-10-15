@@ -5,27 +5,19 @@
 //    ecSWMM is provided as free software: under the terms of the BSD free 
 //    software license included in the file repository. 
 //	  
+//    Authors: Fred Meyers, Ruben Kertesz, EmNet, LLC. <github @ emnet.net>
+//
 //	  Portions of this software have not been changed from the original
 //	  source provided to public domain by EPA SWMM.
 //
 //-----------------------------------------------------------------------------
-//    ecSWMM 5.1.007.03
+//    ecSWMM 5.1.010
 //-----------------------------------------------------------------------------
 //   controls.c
 //
-//   Project:  EPA SWMM5
-//   Version:  5.1
-<<<<<<< HEAD
-//   Date:     03/21/14 (Build 5.1.001) + EMNET additions (1.03)
-//				EMNET 1.03 -- use 8-byte file pointers to eliminate the effective 2.1G limitation on .out file.
-//				EMNET 1.02 -- correct compiler optimization issue for DLL.
-//				EMNET 1.01 -- add Stack Commands to Control section.
-=======
-//   Date:     03/21/14 (Build 5.1.001)
-//             03/19/15 (Build 5.1.008)
-//             04/30/15 (Build 5.1.009)
+// BASED OFF OF HEAD RELEASE at OpenWaterAnalytics
 //             08/05/15 (Build 5.1.010)
->>>>>>> OpenWaterAnalytics/master
+
 //   Author:   L. Rossman
 //
 //   Rule-based controls functions.
@@ -66,43 +58,39 @@
 //
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
-
-<<<<<<< HEAD
 #define MAX_STACK  1000			//2014-09-02:EMNET
 #define BIG_NUMBER 1e32			//2014-09-04:EMNET
 #define EPSILON    1e-20		//2014-09-04:EMNET
-
-=======
 #include <string.h>
->>>>>>> OpenWaterAnalytics/master
 #include <malloc.h>
 #include <math.h>
-#include <string.h>				//2014-08-12:EMNET
 #include "headers.h"
 
 //-----------------------------------------------------------------------------
 //  Constants
 //-----------------------------------------------------------------------------
-<<<<<<< HEAD
+
 enum RuleState   {r_RULE, r_IF, r_AND, r_OR, r_THEN, r_ELSE, r_PRIORITY,
                   r_ERROR};
 enum RuleObject  {r_NODE, r_LINK, r_CONDUIT, r_PUMP, r_ORIFICE, r_WEIR,
 	              r_OUTLET, r_SIMULATION, r_STACK};								//2014-08-28:EMNET: added r_STACK
-enum RuleAttrib  {r_DEPTH, r_HEAD, r_INFLOW, r_FLOW, r_STATUS, r_SETTING,
-                  r_TIME, r_DATE, r_CLOCKTIME, r_DAY, r_MONTH, r_STACK_RESULT, r_STACK_OPER};			//2014-08-28:EMNET: added r_STACK_RESULT, r_STACK_OPER
-enum RuleOperand {EQ, NE, LT, LE, GT, GE, 
-					Stack_Enter, Stack_Pop, Stack_Add, Stack_Subtract, Stack_Multiply, Stack_Divide, Stack_Expo, Stack_Invert,
-					Stack_ChangeSign, Stack_Swap, Stack_LOG10, Stack_LN, Stack_EXP, Stack_SQRT,
-					Stack_SIN, Stack_COS, Stack_TAN, Stack_ASIN, Stack_ACOS, Stack_ATAN,					
-					Stack_Equal, Stack_NotEqual, Stack_Greater, Stack_GreaterEqual, Stack_LessThan, Stack_LessThanEqual,
-					Stack_Back};		//2014-08-28:EMNET: added Stack Operands
+enum RuleAttrib  {r_DEPTH, r_HEAD, r_VOLUME, r_INFLOW, r_FLOW, r_STATUS, r_SETTING,
+                  r_TIMEOPEN, r_TIMECLOSED, r_TIME, r_DATE, 
+				  r_CLOCKTIME, r_DAY, r_MONTH, r_STACK_RESULT, r_STACK_OPER};			//2014-08-28:EMNET: added r_STACK_RESULT, r_STACK_OPER
+//enum RuleRelation {EQ, NE, LT, LE, GT, GE}; Removed from head build and replaced with below // EMNET RK 2015-09-08
+enum RuleRelation {EQ, NE, LT, LE, GT, GE, 
+				Stack_Enter, Stack_Pop, Stack_Add, Stack_Subtract, Stack_Multiply, Stack_Divide, Stack_Expo, Stack_Invert,
+				Stack_ChangeSign, Stack_Swap, Stack_LOG10, Stack_LN, Stack_EXP, Stack_SQRT,
+				Stack_SIN, Stack_COS, Stack_TAN, Stack_ASIN, Stack_ACOS, Stack_ATAN,					
+				Stack_Equal, Stack_NotEqual, Stack_Greater, Stack_GreaterEqual, Stack_LessThan, Stack_LessThanEqual,
+				Stack_Back};		//2014-08-28:EMNET: added Stack Operands
 
 /// SEE BELOW!!!!!!!!!! --------------- enum RuleSetting { r_CURVE, r_TIMESERIES, r_PID, r_PID2, r_PID3, r_STACKRESULT_ACTION, r_NUMERIC };			//2014-08-28L added r_STACKRESULT_ACTION;  2014-09-10:r_PID2, r_PID3
 
-
 //2014-10-15:EMNET: the logic that uses Attributes gets confused in some cases of a RuleAttib having the same value as a RuleSetting.
 //Rather than track down all the instances of logic problems, just bump the RuleSetting values up by 100 to keep them separate.  Nothing really uses the enum directly.
-
+//2015-10-15:This has been made likely unnecessary by the LHS <relation> RHS rule structure, however it shall remain until thoroughly proven unnecessary 
+/*
 const int r_CURVE = 100;
 const int r_TIMESERIES = 101;
 const int r_PID = 102;
@@ -110,36 +98,30 @@ const int r_PID2 = 103;						//2014-09-10:EMNET
 const int r_PID3 = 104;						//2014-09-10:EMNET
 const int r_STACKRESULT_ACTION = 105;		//2014-08-28:EMNET
 const int r_NUMERIC = 106;
-
-=======
-enum RuleState    {r_RULE, r_IF, r_AND, r_OR, r_THEN, r_ELSE, r_PRIORITY,
-                   r_ERROR};
-enum RuleObject   {r_NODE, r_LINK, r_CONDUIT, r_PUMP, r_ORIFICE, r_WEIR,
-	               r_OUTLET, r_SIMULATION};
-enum RuleAttrib   {r_DEPTH, r_HEAD, r_VOLUME, r_INFLOW, r_FLOW, r_STATUS,      //(5.1.008)
-                   r_SETTING, r_TIMEOPEN, r_TIMECLOSED, r_TIME, r_DATE,        //(5.1.010)
-                   r_CLOCKTIME, r_DAY, r_MONTH};
-enum RuleRelation {EQ, NE, LT, LE, GT, GE};
-enum RuleSetting  {r_CURVE, r_TIMESERIES, r_PID, r_NUMERIC};
->>>>>>> OpenWaterAnalytics/master
+*/
+//The above used to use const int but this throws a fit using GCC compiler. Changed to close reported issue. ///RK
+#define r_CURVE 100
+#define r_TIMESERIES 101
+#define r_PID 102
+#define r_PID2 103						//2014-09-10:EMNET
+#define r_PID3 104						//2014-09-10:EMNET
+#define r_STACKRESULT_ACTION 105		//2014-08-28:EMNET
+#define r_NUMERIC 106
 
 static char* ObjectWords[] =
     {"NODE", "LINK", "CONDUIT", "PUMP", "ORIFICE", "WEIR", "OUTLET",
 	 "SIMULATION", "STACK", NULL};
+	 
 static char* AttribWords[] =
-<<<<<<< HEAD
-    {"DEPTH", "HEAD", "INFLOW", "FLOW", "STATUS", "SETTING",
-     "TIME", "DATE", "CLOCKTIME", "DAY", "MONTH", "RESULT", "OP", NULL};			//2014-08-28:EMNET: aded RESULT and OP for STACK object
-static char* OperandWords[] = { "=", "<>", "<", "<=", ">", ">=",
+    {"DEPTH", "HEAD", "VOLUME", "INFLOW", "FLOW", "STATUS", "SETTING",         //(5.1.008)
+     "TIMEOPEN", "TIMECLOSED","TIME", "DATE", "CLOCKTIME", "DAY", "MONTH",     //(5.1.010)
+     "RESULT", "OP", NULL}; //2014-08-28:EMNET: aded RESULT and OP for STACK object
+	 
+static char* RelOpWords[] = {"=", "<>", "<", "<=", ">", ">=", //NULL}; // ///RK comment 9/13/2015. Many in list were taken from 5.1.007 operand word list
 "[ENTER]", "[POP]", "[+]", "[-]", "[*]", "[/]", "[y^x]", "[1/x]",
 "[CHS]", "[SWAP]", "[LOG10]", "[LN]", "[EXP]", "[SQRT]", "[SIN]", "[COS]", "[TAN]", "[ASIN]", "[ACOS]", "[ATAN]",
 "[X=Y]", "[X<>Y]", "[X>Y]", "[X>=Y]", "[X<Y]", "[X<=Y]", "[BACK]", NULL };
-=======
-    {"DEPTH", "HEAD", "VOLUME", "INFLOW", "FLOW", "STATUS", "SETTING",         //(5.1.008)
-     "TIMEOPEN", "TIMECLOSED","TIME", "DATE", "CLOCKTIME", "DAY", "MONTH",     //(5.1.010)
-     NULL};
-static char* RelOpWords[] = {"=", "<>", "<", "<=", ">", ">=", NULL};
->>>>>>> OpenWaterAnalytics/master
+
 static char* StatusWords[]  = {"OFF", "ON", NULL};
 static char* ConduitWords[] = {"CLOSED", "OPEN", NULL};
 static char* SettingTypeWords[] = { "CURVE", "TIMESERIES", "PID", "PID2", "PID3", "STACK", NULL };		//2014-09-04:EMNET: added STACK RESULT as a SETTING type;  2014-09-10:PID2, PID3
@@ -169,17 +151,6 @@ struct  TPremise
 // Rule Action Clause
 struct  TAction              
 {
-<<<<<<< HEAD
-   int     rule;
-   int     link;
-   int     attribute;
-   int     curve;
-   int     tseries;
-   double  value;
-   double  kp, ki, kd;
-   double  e1, e2, e3;			//2014-09-23:EMNET: added e3 for the PID3 derivative term
-   struct  TAction *next;
-=======
    int     rule;             // index of rule that action belongs to
    int     link;             // index of link being controlled
    int     attribute;        // attribute of link being controlled
@@ -187,9 +158,8 @@ struct  TAction
    int     tseries;          // index of time series for modulated control
    double  value;            // control setting for link attribute
    double  kp, ki, kd;       // coeffs. for PID modulated control
-   double  e1, e2;           // PID set point error from previous time steps
+   double  e1, e2, e3;           // PID set point error from previous time steps //2014-09-23:EMNET: added e3 for the PID3 derivative term
    struct  TAction *next;    // next action clause of rule
->>>>>>> OpenWaterAnalytics/master
 };
 
 // List of Control Actions
@@ -249,6 +219,9 @@ extern REAL4* LinkResults;             //  "
 //-----------------------------------------------------------------------------
 //  Local functions
 //-----------------------------------------------------------------------------
+
+
+int checkValue(struct TPremise* p, double x);
 int    addPremise(int r, int type, char* Tok[], int nToks);
 int    getPremiseVariable(char* tok[], int* k, struct TVariable* v);
 int    getPremiseValue(char* token, int attrib, double* value);
@@ -272,7 +245,6 @@ int    setActionSetting(char* tok[], int nToks, int* curve, int* tseries,
 void   updateActionValue(struct TAction* a, DateTime currentTime, double dt);
 double getPIDSetting(struct TAction* a, double dt);
 
-<<<<<<< HEAD
 double getPID2_Setting(struct TAction* a, double dt);
 double getPID3_Setting(struct TAction* a, double dt);
 
@@ -281,8 +253,7 @@ double Stack_Pop_value();
 void Clear_Stack();
 double Fetch_Stack_Operand(struct TPremise* p);
 
-=======
->>>>>>> OpenWaterAnalytics/master
+
 //=============================================================================
 
 int  controls_create(int n)
@@ -393,7 +364,7 @@ int controls_evaluate(DateTime currentTime, DateTime elapsedTime, double tStep)
 //
 {
     int    r;                          // control rule index
-    int    result;                     // TRUE if rule premises satisfied
+    static int    result;                     // TRUE if rule premises satisfied
     struct TPremise* p;                // pointer to rule premise clause
     struct TAction*  a;                // pointer to rule action clause
 
@@ -422,7 +393,7 @@ int controls_evaluate(DateTime currentTime, DateTime elapsedTime, double tStep)
             }
             else
             {
-                if ( result == FALSE ) break;
+                if ( result == FALSE ) break;  // and condition ///RK - ideally rule results and premis results separate var
                 result = evaluatePremise(p, tStep);
             }
             p = p->next;
@@ -458,185 +429,23 @@ int  addPremise(int r, int type, char* tok[], int nToks)
 //  Output:  returns an error code
 //  Purpose: adds a new premise to a control rule.
 //
-{
-<<<<<<< HEAD
-	int    node = -1;
-	int    link = -1;
-	int    obj, attrib, op, n;
-	double value;
-	struct TPremise* p;
-
-	// --- make sure there is at least 1 token ---- 2014-09-04:EMNET
-	if (nToks < 1) return ERR_ITEMS;
-
-	// --- get object type
-	obj = findExactMatch(tok[1], ObjectWords);			//2014-08-13:EMNET: this was just findmatch() before
-	if (obj < 0) return error_setInpError(ERR_KEYWORD, tok[1]);
-
-	// --- check for proper number of tokens (moved below "get object type")
-	if (obj != r_STACK)		//2014-09-04:EMNET
-		if (nToks < 5) return ERR_ITEMS;
-
-
-	// --- get object name
-	n = 2;
-	switch (obj)
-	{
-	case r_NODE:
-		node = project_findObject(NODE, tok[n]);
-		if (node < 0) return error_setInpError(ERR_NAME, tok[n]);
-		break;
-
-	case r_LINK:
-	case r_CONDUIT:
-	case r_PUMP:
-	case r_ORIFICE:
-	case r_WEIR:
-	case r_OUTLET:
-		link = project_findObject(LINK, tok[n]);
-		if (link < 0) return error_setInpError(ERR_NAME, tok[n]);
-		break;
-
-
-	case r_SIMULATION:		//2014-08-14:EMNET (was simply handled as default case before)
-	case r_STACK:			//2014-08-28:EMNET
-	default: n = 1;			//since there is no NAME following SIMULATION or STACK, as there is with NODE or LINK, etc.
-		break;
-	}
-	n++;
-
-	// --- get attribute name
-	attrib = findExactMatch(tok[n], AttribWords);			//2014-08-13:EMNET: this was just findmatch() before
-	if (attrib < 0) return error_setInpError(ERR_KEYWORD, tok[n]);
-
-	// --- check that property belongs to object type
-	if (obj == r_NODE) switch (attrib)
-	{
-	case r_DEPTH:
-	case r_HEAD:
-	case r_INFLOW: break;
-	default: return error_setInpError(ERR_KEYWORD, tok[n]);
-	}
-	else if (obj == r_LINK || obj == r_CONDUIT) switch (attrib)
-	{
-	case r_STATUS:
-	case r_DEPTH:
-	case r_FLOW: break;
-	default: return error_setInpError(ERR_KEYWORD, tok[n]);
-	}
-	else if (obj == r_PUMP) switch (attrib)
-	{
-	case r_FLOW:
-	case r_STATUS: break;
-	default: return error_setInpError(ERR_KEYWORD, tok[n]);
-	}
-	else if (obj == r_ORIFICE || obj == r_WEIR ||
-		obj == r_OUTLET) switch (attrib)
-	{
-		case r_SETTING: break;
-		default: return error_setInpError(ERR_KEYWORD, tok[n]);
-	}
-	else switch (attrib)
-	{
-	case r_TIME:
-	case r_DATE:
-	case r_CLOCKTIME:
-	case r_DAY:
-	case r_MONTH: break;
-	case r_STACK_RESULT: break;				//2014-08-28:EMNET
-	case r_STACK_OPER:   break;				//2014-09-03:EMNET
-	default: return error_setInpError(ERR_KEYWORD, tok[n]);
-	}
-
-	// --- get operand
-	n++;
-	op = findExactMatch(tok[n], OperandWords);			//2013-08-13:EMNET: THIS IS THE ONE PLACE THAT ORIGINALLY DID HAVE findExactMatch().
-	if (op < 0) return error_setInpError(ERR_KEYWORD, tok[n]);
-	n++;
-	if (n >= nToks) return error_setInpError(ERR_ITEMS, "");
-
-	// --- get value
-
-
-	if (_stricmp(tok[n], "---") == 0) {		//2014-09-04:EMNET: allow for possibly "empty" stack value
-		value = 0.0;						//2014-09-04:EMNET: just to give it some value (will not be used anywhere)
-	}
-	else {
-		switch (attrib)
-		{
-		case r_STATUS:
-			value = findExactMatch(tok[n], StatusWords);							//2014-08-13:EMNET: this was just findmatch() before
-			if (value < 0.0) value = findExactMatch(tok[n], ConduitWords);			//2014-08-13:EMNET: this was just findmatch() before
-			if (value < 0.0) return error_setInpError(ERR_KEYWORD, tok[n]);
-			break;
-
-		case r_TIME:
-		case r_CLOCKTIME:
-			if (!datetime_strToTime(tok[n], &value))
-				return error_setInpError(ERR_DATETIME, tok[n]);
-			break;
-
-		case r_DATE:
-			if (!datetime_strToDate(tok[n], &value))
-				return error_setInpError(ERR_DATETIME, tok[n]);
-			break;
-
-		case r_DAY:
-			if (!getDouble(tok[n], &value))
-				return error_setInpError(ERR_NUMBER, tok[n]);
-			if (value < 1.0 || value > 7.0)
-				return error_setInpError(ERR_DATETIME, tok[n]);
-			break;
-
-		case r_MONTH:
-			if (!getDouble(tok[n], &value))
-				return error_setInpError(ERR_NUMBER, tok[n]);
-			if (value < 1.0 || value > 12.0)
-				return error_setInpError(ERR_DATETIME, tok[n]);
-			break;
-
-		default:
-
-			if (_stricmp(tok[n], "---") == 0) {		//2014-09-03:EMNET: allow for possibly "empty" stack value
-				value = 0.0;						//2014-09-03:EMNET: just to give it some value (will not be used anywhere)
-			}
-			else {
-				if ( !getDouble(tok[n], &value) )
-					return error_setInpError(ERR_NUMBER, tok[n]);			
-			}
-		}
-	}
-
-    // --- check if another clause is on same line
-    n++; 
-	if (n < nToks && findExactMatch(tok[n], RuleKeyWords) >= 0) return ERR_RULE;			//2014-08-13:EMNET: this was just findmatch() before
-
-    // --- create the premise object
-    p = (struct TPremise *) malloc(sizeof(struct TPremise));
-    if ( !p ) return ERR_MEMORY;
-    p->type      = type;
-    p->node      = node;
-    p->link      = link;
-    p->attribute = attrib;
-    p->operand   = op;
-    p->value     = value;		//<----------------NORMAL SWMM LINE OF CODE
-
-
-    p->next      = NULL;
-    if ( Rules[r].firstPremise == NULL )
-    {
-        Rules[r].firstPremise = p;
-=======
+{	
     int    relation, n, err = 0;
     double value = MISSING;
     struct TPremise* p;
     struct TVariable v1;
     struct TVariable v2;
+	int    obj; // 2015-9-8 RK EMNET added back in to get correct number of tokens depending on if we are using stack or not
 
-    // --- check for minimum number of tokens
-    if ( nToks < 5 ) return ERR_ITEMS;
+//	if (nToks < 5) return ERR_ITEMS;	// original 5.1.010 code
+	 // --- make sure there is at least 1 token ---- 2014-09-04:EMNET
+	if (nToks < 1) return ERR_ITEMS;	// ---- 2014-09-04:EMNET
+	obj = findExactMatch(tok[1], ObjectWords);			//2014-08-13:EMNET: this was just findmatch() before 
+	if (obj < 0) return error_setInpError(ERR_KEYWORD, tok[1]); // EMNET 2015-9-13
+	if (obj != r_STACK)		//2014-09-04:EMNET
+		if (nToks < 5) return ERR_ITEMS;
 
-    // --- get LHS variable
+    // --- get LHS variable /// Why isn't v1 initialized with parameters (in original 5.1.010 code)? ///RK 10-9-15
     n = 1;
     err = getPremiseVariable(tok, &n, &v1);
     if ( err > 0 ) return err;
@@ -647,6 +456,7 @@ int  addPremise(int r, int type, char* tok[], int nToks)
     if ( relation < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
     n++;
 
+	
     // --- initialize RHS variable
     v2.attribute = -1;
     v2.link = -1;
@@ -654,26 +464,31 @@ int  addPremise(int r, int type, char* tok[], int nToks)
 
     // --- check that more tokens remain
     if ( n >= nToks ) return error_setInpError(ERR_ITEMS, "");
-        
-    // --- see if a RHS variable is supplied
-    if ( findmatch(tok[n], ObjectWords) >= 0 && n + 3 >= nToks )
-    {
-        err = getPremiseVariable(tok, &n, &v2);
-        if ( err > 0 ) return ERR_RULE;                                        //(5.1.009)
-        if ( v1.attribute != v2.attribute)                                     //(5.1.009)
-            report_writeWarningMsg(WARN11, Rules[r].ID);                       //(5.1.009)
-    }
+		
+  
+	if (_stricmp(tok[n], "---") == 0) {		//2014-09-04:EMNET: allow for possibly "empty" stack value
+		value = 0.0;						//2014-09-04:EMNET: just to give it some value (will not be used anywhere)
+	}
+	// --- otherwise get value to which LHS variable is compared to
+	else	{
+		// --- see if a RHS variable is supplied
+		  if ( findmatch(tok[n], ObjectWords) >= 0 && n + 3 >= nToks )  
+		//  looks like stich case for Date, Day, etc... ///RK 
+		 {
+			err = getPremiseVariable(tok, &n, &v2);
+			if ( err > 0 ) return ERR_RULE;                                        //(5.1.009)
+			if ( v1.attribute != v2.attribute)                                     //(5.1.009)
+				report_writeWarningMsg(WARN11, Rules[r].ID);                       //(5.1.009)
+		}
 
-    // --- otherwise get value to which LHS variable is compared to
-    else
-    {
         err = getPremiseValue(tok[n], v1.attribute, &value);
         n++;
     }
     if ( err > 0 ) return err;
 
     // --- make sure another clause is not on same line
-    if ( n < nToks && findmatch(tok[n], RuleKeyWords) >= 0 ) return ERR_RULE;
+    //if ( n < nToks && findmatch(tok[n], RuleKeyWords) >= 0 ) return ERR_RULE; // original 5.1.010 code
+	if (n < nToks && findExactMatch(tok[n], RuleKeyWords) >= 0) return ERR_RULE;			//2014-08-13:EMNET: this was just findmatch() before
 
     // --- create the premise object
     p = (struct TPremise *) malloc(sizeof(struct TPremise));
@@ -695,6 +510,10 @@ int  addPremise(int r, int type, char* tok[], int nToks)
     Rules[r].lastPremise = p;
     return 0;
 }
+	
+	
+	
+
 
 //=============================================================================
 
@@ -714,7 +533,8 @@ int getPremiseVariable(char* tok[], int* k, struct TVariable* v)
     int    obj, attrib;
 
     // --- get object type
-    obj = findmatch(tok[n], ObjectWords);
+    //obj = findmatch(tok[n], ObjectWords);
+	obj = findExactMatch(tok[n], ObjectWords);			//2014-08-13:EMNET: this was just findmatch() before // Revised [1] to [n] 2015-9-8 RK
     if ( obj < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
 
     // --- get object index from its name
@@ -735,12 +555,18 @@ int getPremiseVariable(char* tok[], int* k, struct TVariable* v)
         link = project_findObject(LINK, tok[n]);
         if ( link < 0 ) return error_setInpError(ERR_NAME, tok[n]);
         break;
+		
+	  case r_SIMULATION:		//2014-08-14:EMNET (was simply handled as default case before)
+	  case r_STACK:			//2014-08-28:EMNET
+	  //default: n = 1;			//since there is no NAME following SIMULATION or STACK, as there is with NODE or LINK, etc.
+      // break;   
       default: n--;
     }
     n++;
 
     // --- get attribute index from its name
-    attrib = findmatch(tok[n], AttribWords);
+    //attrib = findmatch(tok[n], AttribWords);
+	attrib = findExactMatch(tok[n], AttribWords);			//2014-08-13:EMNET: this was just findmatch() before
     if ( attrib < 0 ) return error_setInpError(ERR_KEYWORD, tok[n]);
 
     // --- check that attribute belongs to object type
@@ -790,6 +616,8 @@ int getPremiseVariable(char* tok[], int* k, struct TVariable* v)
       case r_CLOCKTIME:
       case r_DAY:
       case r_MONTH: break;
+	  case r_STACK_RESULT: break;				//2014-08-28:EMNET
+	  case r_STACK_OPER:   break;				//2014-09-03:EMNET
       default: return error_setInpError(ERR_KEYWORD, tok[n]);
     }
 
@@ -850,7 +678,6 @@ int getPremiseValue(char* token, int attrib, double* value)
        
       default: if ( !getDouble(token, value) )
           return error_setInpError(ERR_NUMBER, token);
->>>>>>> OpenWaterAnalytics/master
     }
     return 0;
 }
@@ -1052,14 +879,14 @@ int  setActionSetting(char* tok[], int nToks, int* curve, int* tseries,
 		//But that ends up using one of the "RuleSetting" codes instead of one from the "RuleAttrib" list, 
 		//and that led to cross-over problems when the lists were updated with new commands.
 		//And that is why all the RuleSetting codes are +100 now -- to avoid those conflicts in evaluatePremise();
+		//2015-10-14 This needs to be evaluated to determine if it remains an issue given the refactoring of official SWMM code in version 5.1.010 ///RK
 
 		*attrib = k;			//2014-09-10:EMNET: r_PID  or r_PID2  or r_PID3
         break;
 
 	case r_STACKRESULT_ACTION:
-		///   CANNOT DO THIS!!!!!!!!!!!!!! ---------------------------------    *attrib = r_STACKRESULT_ACTION;			//2014-09-04:EMNET
-		///   attrib is only for the item on the LEFT of the equal sign!!!!!!!!!!!!!!!!!!!!
-
+		///   *attrib = r_STACKRESULT_ACTION;			//2014-09-04:EMNET
+		///   attrib is only for the item on the LEFT of the equal sign.
 		//2014-10-10: NEW WAY OF MARKING "STACK RESULT" on the right side of equal sign in an Action:
 		*curve = -999;
 		*tseries = -999;
@@ -1385,73 +1212,111 @@ int executeActionList(DateTime currentTime)
 
 //=============================================================================
 
-<<<<<<< HEAD
+/* <<<<<<< HEAD
 int evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
-	DateTime elapsedTime, double tStep)
-	//
-	//  Input:   p = a control rule premise condition
-	//           theDate = the current simulation date
-	//           theTime = the current simulation time of day
-	//           elpasedTime = decimal days since the start of the simulation
-	//           tStep = current time step (days)
-	//  Output:  returns TRUE if the condition is true or FALSE otherwise
-	//  Purpose: evaluates the truth of a control rule premise condition.
-	//
+
+======= */
+
+int evaluatePremise(struct TPremise* p, double tStep)
+//
+//  Input:   p = a control rule premise condition
+//           tStep = current time step (days)
+//  Output:  returns TRUE if the condition is true or FALSE otherwise
+//  Purpose: evaluates the truth of a control rule premise condition.
+//
 {
-	int i = p->node;
-	int j = p->link;
-	double head;
+    double lhsValue, rhsValue;
+	
+	/// Fred moved this above getvariablevalue to prevent its execution when dealing with stack result or stack op /// Clean up comments ///RK 10-14-15
+	////Added by RK 10-9-15 because getVariableValue uses struct that is beneath TPremise, therefore incompatible with Value comparison
+	switch (p->lhsVar.attribute)
+	{
+	case r_STACK_RESULT:
+		return checkValue(p, Control_Stack[Stack_Index]);				//2014-09-02:EMNET: COMPARE premise value with current TOP-of-STACK -- or PERFORM STACK OPERATION
 
-	long Back_Steps;
+	case r_STACK_OPER:
+		if (p->relation == Stack_Enter) {     //09-15-2015 EmNet Changed operand to relation //RK
+			Stack_Push(p->value);				//2014-09-03:EMNET: PUSH new STACK VALUE onto the TOP-of-STACK
+			return TRUE;
+		}
+		else {
+			return checkValue(p, p->value);				//2014-09-02:EMNET: COMPARE premise value with current TOP-of-STACK -- or PERFORM STACK OPERATION
+		}
+	}
+	/////Continue to check to see if we introduced a bug by not using evaluation of missing data as per getVariableValue END RK 10-9-15////
+
+	////Original code 5.1.010 ///RK
+	lhsValue = getVariableValue(p->lhsVar);
+	if (p->value == MISSING) rhsValue = getVariableValue(p->rhsVar);         //(5.1.008)
+	else                       rhsValue = p->value;                            //(5.1.008)
+	if (lhsValue == MISSING || rhsValue == MISSING) return FALSE;
+
+	//// Fred placed here to utilize result from getVariableValue ... We need lhsValue populated ///RK 10-14-15
+	if (p->relation == Stack_Enter) {     //09-15-2015 EmNet Changed operand to relation //RK
+		Stack_Push(lhsValue);				//2014-09-03:EMNET: PUSH new STACK VALUE onto the TOP-of-STACK
+		return TRUE;
+	}
+
+
+	long Back_Steps; // EmNet Variable ///RK
 	double back_value = 0.0;
-	int myAttribute = p->attribute;
-	DateTime myDateTime;
-	long numSeconds;
+	int myAttribute = p->lhsVar.attribute;//attribute;
+//	DateTime myDateTime;
+//	long numSeconds;
+//	int hour, min, sec;
+//	double myValue;
 
-	int hour, min, sec;
-	double myValue;
+	
+	
+	
+		//**********2014-09-11:EMNET: process [BACK] commands.********************
+	if (p->relation == Stack_Back) {
+		///RK changed operand to value
 
-	//2014-09-11:EMNET: process [BACK] commands.
-	if (p->operand == Stack_Back) {
+		//// ===========================================================================================================================
+		//// TIME [BACK] will probably never be used, but here is working code A) to illustrate elapsed time manipulation and B) in case the function is needed someday.
+		////Note that you really could accomplish the same thing by pushing SYSTEM TIME onto the stack then subtracting a decimal DateTime value.
+		//if (myAttribute == r_TIME)	{
+		//	if (elapsedTime > (p->value)) {			//	p->value for TIME is in decimal time format, coming from HH:MM:SS format on CONTROLS premise line
+		//		//just compute the time; no reference to the output file:
+		//		numSeconds = datetime_timeDiff(elapsedTime, (p->value));			//myDateTime becomes the decimal value of ELAPSED SIMULATION TIME,  [BACK] the specified amount
+		//		myValue = ((double)numSeconds / (double)SECperDAY);
+		//		Stack_Push(myValue);
+		//		return TRUE;
+		//	}
+		//	else {
+		//		return FALSE;
+		//	}
+		//}
 
+		//// CLOCKTIME [BACK] will probably never be used, but here is working code A) to illustrate time-of-day manipulation and B) in case the function is needed someday:
+		//if (myAttribute == r_CLOCKTIME) {
+		//	//Must use REPORTSTEP -- not routing step! -- for [BACK] calculations, because only values at REPORT STEPS get recorded in the binary file.
+		//	Back_Steps = (long)((((p->value * 24.0 * 60.0 * 60.0) / (double)ReportStep) + 0.5));     //because CLOCKTIME has a decimal DateTime p->value, not "number of seconds" like LINK and NODE premises
+		//	if ((Back_Steps >= 0) && ((Nperiods - Back_Steps) > 0)) {
+		//		output_readDateTime(Nperiods - Back_Steps, &myDateTime);	//myDateTime the decimal value of TIME-OF-DAY, [BACK] the specified amount from the current report step
+		//		datetime_decodeTime(myDateTime, &hour, &min, &sec);			//year, month, day are IGNORED for CLOCKTIME
+		//		myValue = ((double)((((hour * 60.0) + min) * 60.0) + sec)) / (double)SECperDAY;
+		//		Stack_Push(myValue);
+		//		return TRUE;
+		//	}
+		//	else {
+		//		return FALSE;
+		//	}
+		//}
+		//// ===========================================================================================================================
+	
 
-		// ===========================================================================================================================
-		// TIME [BACK] will probably never be used, but here is working code A) to illustrate elapsed time manipulation and B) in case the function is needed someday.
-		//Note that you really could accomplish the same thing by pushing SYSTEM TIME onto the stack then subtracting a decimal DateTime value.
-		if (p->attribute == r_TIME)	{
-			if (elapsedTime > (p->value)) {			//	p->value for TIME is in decimal time format, coming from HH:MM:SS format on CONTROLS premise line
-				//just compute the time; no reference to the output file:
-				numSeconds = datetime_timeDiff(elapsedTime, (p->value));			//myDateTime becomes the decimal value of ELAPSED SIMULATION TIME,  [BACK] the specified amount
-				myValue = ((double)numSeconds / (double)SECperDAY);
-				Stack_Push(myValue);
-				return TRUE;
-			}
-			else {
-				return FALSE;
-			}
-		}
-
-		// CLOCKTIME [BACK] will probably never be used, but here is working code A) to illustrate time-of-day manipulation and B) in case the function is needed someday:
-		if (p->attribute == r_CLOCKTIME) {
-			//Must use REPORTSTEP -- not routing step! -- for [BACK] calculations, because only values at REPORT STEPS get recorded in the binary file.
-			Back_Steps = (long)((((p->value * 24.0 * 60.0 * 60.0) / (double)ReportStep) + 0.5));     //because CLOCKTIME has a decimal DateTime p->value, not "number of seconds" like LINK and NODE premises
-			if ((Back_Steps >= 0) && ((Nperiods - Back_Steps) > 0)) {
-				output_readDateTime(Nperiods - Back_Steps, &myDateTime);	//myDateTime the decimal value of TIME-OF-DAY, [BACK] the specified amount from the current report step
-				datetime_decodeTime(myDateTime, &hour, &min, &sec);			//year, month, day are IGNORED for CLOCKTIME
-				myValue = ((double)((((hour * 60.0) + min) * 60.0) + sec)) / (double)SECperDAY;
-				Stack_Push(myValue);
-				return TRUE;
-			}
-			else {
-				return FALSE;
-			}
-		}
-		// ===========================================================================================================================
-		
 		//below is the code for the normal cases:   NODE [BACK] commands    and    LINK [BACK] commands:
 
 		//Must use REPORTSTEP -- not routing step! -- for [BACK] calculations, because only values at REPORT STEPS get recorded in the binary file.
 		Back_Steps = (long)(((p->value / (double)ReportStep)) + 0.5);		//9-23-2014: round [BACK] seconds-count to long integer Back_Steps
+
+		//////***Used to be in the old controls added back by RK******
+		/// Fred recommended moving to this location (within Stack_Back) to prevent confusion in upstream code ///RK
+		/// Untested as of 10-14-2015 ///RK
+		int i = p->lhsVar.node; // We probably need to remove this. Vestigial? ///RK 
+		int j = p->lhsVar.link; 
 
 		if ((Back_Steps >= 0) && ((Nperiods - Back_Steps) > 0)) {
 
@@ -1502,34 +1367,14 @@ int evaluatePremise(struct TPremise* p, DateTime theDate, DateTime theTime,
 			return TRUE;
 		}
 
-
-
-
-
-
 		else
 			return FALSE;		//cannot compute BACK until Nperiods > Back_Steps
 	}
 
-
-
-
-=======
-int evaluatePremise(struct TPremise* p, double tStep)
-//
-//  Input:   p = a control rule premise condition
-//           tStep = current time step (days)
-//  Output:  returns TRUE if the condition is true or FALSE otherwise
-//  Purpose: evaluates the truth of a control rule premise condition.
-//
-{
-    double lhsValue, rhsValue;
->>>>>>> OpenWaterAnalytics/master
-
-    lhsValue = getVariableValue(p->lhsVar);
-    if ( p->value == MISSING ) rhsValue = getVariableValue(p->rhsVar);         //(5.1.008)
-    else                       rhsValue = p->value;                            //(5.1.008)
-    if ( lhsValue == MISSING || rhsValue == MISSING ) return FALSE;
+//*******************End of Stack Commands************ RK	
+	
+	
+	
     switch (p->lhsVar.attribute)
     {
     case r_TIME:
@@ -1537,6 +1382,7 @@ int evaluatePremise(struct TPremise* p, double tStep)
     case r_TIMEOPEN:                                                           //(5.1.010)
     case r_TIMECLOSED:                                                         //(5.1.010)
         return compareTimes(lhsValue, p->relation, rhsValue, tStep/2.0); 
+
     default:
         return compareValues(lhsValue, p->relation, rhsValue);
     }
@@ -1551,13 +1397,8 @@ double getVariableValue(struct TVariable v)
 
     switch ( v.attribute )
     {
-<<<<<<< HEAD
-	  case r_TIME:
-        return checkTimeValue(p, elapsedTime, tStep/2.0);
-=======
       case r_TIME:
         return ElapsedTime;
->>>>>>> OpenWaterAnalytics/master
         
       case r_DATE:
         return CurrentDate;
@@ -1599,21 +1440,6 @@ double getVariableValue(struct TVariable v)
         if ( i < 0 ) return MISSING;
         return (Node[i].newVolume * UCF(VOLUME));
 
-<<<<<<< HEAD
-	  case r_STACK_RESULT:
-		  return checkValue(p,Control_Stack[Stack_Index]);				//2014-09-02:EMNET: COMPARE premise value with current TOP-of-STACK -- or PERFORM STACK OPERATION
-
-	  case r_STACK_OPER:
-		  if (p->operand == Stack_Enter) {
-			  Stack_Push(p->value);				//2014-09-03:EMNET: PUSH new STACK VALUE onto the TOP-of-STACK
-			  return TRUE;
-		  }
-		  else {
-			  return checkValue(p, p->value);				//2014-09-02:EMNET: COMPARE premise value with current TOP-of-STACK -- or PERFORM STACK OPERATION
-		  }
-
-      default: return FALSE;
-=======
       case r_INFLOW:
         if ( i < 0 ) return MISSING;
         else return Node[i].newLatFlow*UCF(FLOW);
@@ -1628,11 +1454,10 @@ double getVariableValue(struct TVariable v)
           if ( j < 0 ) return MISSING;
           if ( Link[j].setting > 0.0 ) return MISSING;
           return CurrentDate + CurrentTime - Link[j].timeLastSet;
-////
+
 
       default: return MISSING;
->>>>>>> OpenWaterAnalytics/master
-    }
+	}
 }
 
 //=============================================================================
@@ -1664,253 +1489,6 @@ int compareTimes(double lhsValue, int relation, double rhsValue, double halfStep
 
 //=============================================================================
 
-<<<<<<< HEAD
-int checkValue(struct TPremise* p, double x)
-//
-//  Input:   p = control rule premise condition
-//           x = value being compared to value in the condition
-//  Output:  returns TRUE if condition is satisfied
-//  Purpose: evaluates the truth of a condition involving a numerical comparison.  AND PERFORMS VARIOUS STACK FUNCTIONS		2014-09-02:EMNET
-//
-{
-	double tempValue = 0.0;			//
-
-    SetPoint = p->value;
-    ControlValue = x;
-    switch (p->operand)
-    {
-		case EQ: if (x == p->value) return TRUE; break;
-		case NE: if (x != p->value) return TRUE; break;
-		case LT: if (x <  p->value) return TRUE; break;
-		case LE: if (x <= p->value) return TRUE; break;
-		case GT: if (x >  p->value) return TRUE; break;
-		case GE: if (x >= p->value) return TRUE; break;
-
-		// ********************************************************************************************************************************************************
-		// ********************************************************************************************************************************************************
-		// ********************************************************************************************************************************************************
-		//2014-09-02:EMNET --- added all STACK COMMANDS:
-		
-		case Stack_Enter:
-			//////if ((p->node == -1) && (p->link == -1))		//if no Node or Link, push the STACK VALUE from the premise
-			if ((p->attribute == r_STACK_OPER) || (p->attribute == r_STACK_RESULT))	{			//use the VALUE from the premise
-				Stack_Push(p->value);
-			}
-			else {
-				Stack_Push(ControlValue);				//otherwise, use the current ControlValue for the specified NODE or LINK from the current step in the simulation
-				if (ControlValue != 0.0)
-					ControlValue = ControlValue;		//breakpoint
-			}
-			return TRUE;
-			break;
-
-		case Stack_Pop:
-			if (Stack_Index < 1) return FALSE;
-			Stack_Pop_value();		//ignoring the returned value
-			return TRUE;
-			break;
-
-		case Stack_Add:
-			if (Stack_Index < 1) return FALSE;
-			///////////2014-10-10: ------------------ Control_Stack[Stack_Index] += Stack_Pop_value();		//OPTIMIZED WRONG IN DLL!!!!  Stack_Index is changed inside Stack_Pop_Value()   2014-10-10
-			tempValue = Stack_Pop_value();
-			Control_Stack[Stack_Index] += tempValue;		//add TOP-of-STACK and proper operand.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
-			return TRUE;
-			break;
-
-		case Stack_Subtract:
-			if (Stack_Index < 1) return FALSE;
-			///////////2014-10-10: ------------------ Control_Stack[Stack_Index] -= Stack_Pop_value();		//OPTIMIZED WRONG IN DLL!!!!  Stack_Index is changed inside Stack_Pop_Value()   2014-10-10
-			tempValue = Stack_Pop_value();
-			Control_Stack[Stack_Index] -= tempValue;		//subtract proper operand from TOP-of-STACK.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
-			return TRUE;
-			break;
-
-		case Stack_Multiply:
-			if (Stack_Index < 1) return FALSE;
-			///////////2014-10-10: ------------------ Control_Stack[Stack_Index] *= Stack_Pop_value();		//multiply TOP-of-STACK by proper operand
-
-			tempValue = Stack_Pop_value();
-			Control_Stack[Stack_Index] *= tempValue;		//multiply TOP-of-STACK by proper operand.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
-			return TRUE;
-			break;
-
-		case Stack_Divide:
-			if (Stack_Index < 1) return FALSE;
-			tempValue = Stack_Pop_value();			//DIVIDE was already set up to use tempValue, and it works fine even when OPTIMIZE FOR SIZE is turned on.
-			if (tempValue != 0.0)
-				Control_Stack[Stack_Index] /= tempValue;		//divide TOP-of-STACK by proper operand
-			else if (Control_Stack[Stack_Index] != 0.0)
-				Control_Stack[Stack_Index] = BIG_NUMBER;				//return a "big" number if divide by zero (but just leave Control_Stack[Stack_Index] = 0.0 if we see 0.0 / 0.0)
-			return TRUE;
-			break;
-
-		case Stack_Expo:
-			if (Stack_Index < 1) return FALSE;
-			tempValue = Stack_Pop_value();
-			Control_Stack[Stack_Index] = pow(Control_Stack[Stack_Index], tempValue);		//raise TOP-of-STACK to the "operand" power
-			return TRUE;
-			break;
-
-//do not use Stack_Pop_value() for UNARY operators.  We do NOT want to pop the stack!
-		case Stack_Invert:
-			if (Stack_Index < 0) return FALSE;
-			if (Control_Stack[Stack_Index] != 0.0)
-				Control_Stack[Stack_Index] = 1.0 / Control_Stack[Stack_Index];
-			return TRUE;
-			break;
-
-		case Stack_ChangeSign:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] *= -1.00;
-			return TRUE;
-			break;
-
-		case Stack_Swap:
-			if (Stack_Index < 1) return FALSE;
-			tempValue = Control_Stack[Stack_Index];
-			Control_Stack[Stack_Index] = Control_Stack[Stack_Index - 1];
-			Control_Stack[Stack_Index - 1] = tempValue;
-			return TRUE;
-			break;
-
-		case Stack_LOG10:
-			if (Stack_Index < 0) return FALSE;
-			if (Control_Stack[Stack_Index] > 0.0)
-				Control_Stack[Stack_Index] = log10(Control_Stack[Stack_Index]);
-			else
-				Control_Stack[Stack_Index] = 0.0;
-			return TRUE;
-			break;
-
-		case Stack_LN:
-			if (Stack_Index < 0) return FALSE;
-			if (Control_Stack[Stack_Index] > 0.0)
-				Control_Stack[Stack_Index] = log(Control_Stack[Stack_Index]);
-			else
-				Control_Stack[Stack_Index] = 0.0;
-			return TRUE;
-			break;
-
-		case Stack_EXP:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] = exp(Control_Stack[Stack_Index]);
-			return TRUE;
-			break;
-
-		case Stack_SQRT:
-			if (Stack_Index < 0) return FALSE;
-			if (Control_Stack[Stack_Index] > 0.0)
-				Control_Stack[Stack_Index] = sqrt(Control_Stack[Stack_Index]);
-			else
-				Control_Stack[Stack_Index] = 0.0;
-			return TRUE;
-			break;
-
-		case Stack_SIN:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] = sin(Control_Stack[Stack_Index]);			//input angle in RADIANS
-			return TRUE;
-			break;
-
-		case Stack_COS:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] = cos(Control_Stack[Stack_Index]);			//input angle in RADIANS
-			return TRUE;
-			break;
-
-		case Stack_TAN:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] = tan(Control_Stack[Stack_Index]);			//input angle in RADIANS
-			return TRUE;
-			break;
-
-		case Stack_ASIN:
-			if (Stack_Index < 0) return FALSE;
-			if (fabs(Control_Stack[Stack_Index]) <= 1.0)
-				Control_Stack[Stack_Index] = asin(Control_Stack[Stack_Index]);		//result angle in RADIANS
-			else
-				Control_Stack[Stack_Index] = BIG_NUMBER;
-			return TRUE;
-			break;
-
-		case Stack_ACOS:
-			if (Stack_Index < 0) return FALSE;
-			if (fabs(Control_Stack[Stack_Index]) <= 1.0)
-				Control_Stack[Stack_Index] = acos(Control_Stack[Stack_Index]);		//result angle in RADIANS
-			else
-				Control_Stack[Stack_Index] = BIG_NUMBER;
-			return TRUE;
-			break;
-
-		case Stack_ATAN:
-			if (Stack_Index < 0) return FALSE;
-			Control_Stack[Stack_Index] = atan(Control_Stack[Stack_Index]);			//result angle in RADIANS
-			return TRUE;
-			break;
-
-
-//Stack comparison operators follow.  Return TRUE or FALSE based on comparison:
-
-
-		case Stack_Equal:
-			if (Stack_Index < 1) return FALSE;
-			if (fabs(Control_Stack[Stack_Index] - Control_Stack[Stack_Index - 1]) <= EPSILON)
-				return TRUE;		//if TOP-of-STACK is CLOSE ENOUGH TO EQUAL TO the next item on the stack
-			else
-				return FALSE;
-			break;
-
-		case Stack_NotEqual:
-			if (Stack_Index < 1) return FALSE;
-			if (fabs(Control_Stack[Stack_Index] - Control_Stack[Stack_Index - 1]) > EPSILON)
-				return TRUE;		//if TOP-of-STACK is NOT CLOSE ENOUGH TO EQUAL TO the next item on the stack
-			else
-				return FALSE;
-			break;
-
-		case Stack_Greater:
-			if (Stack_Index < 1) return FALSE;
-			if (Control_Stack[Stack_Index] > Control_Stack[Stack_Index - 1])
-				return TRUE;		//if TOP-of-STACK is GREATER THAN the next item on the stack
-			else
-				return FALSE;
-			break;
-
-		case Stack_GreaterEqual:
-			if (Stack_Index < 1) return FALSE;
-			if (Control_Stack[Stack_Index] >= Control_Stack[Stack_Index - 1])
-				return TRUE;		//if TOP-of-STACK is GREATER THAN OR EQUAL TO the next item on the stack
-			else
-				return FALSE;
-			break;
-
-
-		case Stack_LessThan:
-			if (Stack_Index < 1) return FALSE;
-			if (Control_Stack[Stack_Index] < Control_Stack[Stack_Index - 1])
-				return TRUE;		//if TOP-of-STACK is LESS THAN the next item on the stack
-			else
-				return FALSE;
-			break;
-
-		case Stack_LessThanEqual:
-			if (Stack_Index < 1) return FALSE;
-			if (Control_Stack[Stack_Index] <= Control_Stack[Stack_Index - 1])
-				return TRUE;		//if TOP-of-STACK is LESS THAN OR EQUAL TO the next item on the stack
-			else
-				return FALSE;
-			break;
-
-
-
-	// ********************************************************************************************************************************************************
-	// ********************************************************************************************************************************************************
-	// ********************************************************************************************************************************************************
-
-
-	}
-=======
 int compareValues(double lhsValue, int relation, double rhsValue)
 //  Input:   lhsValue = value on left hand side of relation
 //           relation = relational operator code (see RuleRelation enumeration)
@@ -1929,9 +1507,258 @@ int compareValues(double lhsValue, int relation, double rhsValue)
       case GT: if ( lhsValue >  rhsValue ) return TRUE; break;
       case GE: if ( lhsValue >= rhsValue ) return TRUE; break;
     }
->>>>>>> OpenWaterAnalytics/master
+
     return FALSE;
 }
+
+
+
+// Added checkValue back in because doesn't really fit with compare value operation. Better to keep separate ///RK 10-8-2015
+int checkValue(struct TPremise* p, double x) 
+//
+//  Input:   p = control rule premise condition
+//           x = value being compared to value in the condition
+//  Output:  returns TRUE if condition is satisfied
+//  Purpose: evaluates the truth of a condition involving a numerical comparison.  AND PERFORMS VARIOUS STACK FUNCTIONS		2014-09-02:EMNET
+//
+{
+	double tempValue = 0.0;			//
+
+	SetPoint = p->value;
+	ControlValue = x;
+
+	switch (p->relation)
+	{
+		// ********************************************************************************************************************************************************
+		// ********************************************************************************************************************************************************
+		// ********************************************************************************************************************************************************
+		//2014-09-02:EMNET --- added all STACK COMMANDS:
+
+	case Stack_Enter:
+		//////if ((p->node == -1) && (p->link == -1))		//if no Node or Link, push the STACK VALUE from the premise
+		if ((p->lhsVar.attribute == r_STACK_OPER) || (p->lhsVar.attribute == r_STACK_RESULT))	{			//use the VALUE from the premise
+			Stack_Push(p->value);
+		}
+		else {
+			Stack_Push(ControlValue);				//otherwise, use the current ControlValue for the specified NODE or LINK from the current step in the simulation
+			if (ControlValue != 0.0)
+				writecon("");		//breakpoint
+		}
+		return TRUE;
+		break;
+
+	case Stack_Pop:
+		if (Stack_Index < 1) return FALSE;
+		Stack_Pop_value();		//ignoring the returned value
+		return TRUE;
+		break;
+
+	case Stack_Add:
+		if (Stack_Index < 1) return FALSE;
+		///////////2014-10-10: ------------------ Control_Stack[Stack_Index] += Stack_Pop_value();		//OPTIMIZED WRONG IN DLL!!!!  Stack_Index is changed inside Stack_Pop_Value()   2014-10-10
+		tempValue = Stack_Pop_value();
+		Control_Stack[Stack_Index] += tempValue;		//add TOP-of-STACK and proper operand.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
+		return TRUE;
+		break;
+
+	case Stack_Subtract:
+		if (Stack_Index < 1) return FALSE;
+		///////////2014-10-10: ------------------ Control_Stack[Stack_Index] -= Stack_Pop_value();		//OPTIMIZED WRONG IN DLL!!!!  Stack_Index is changed inside Stack_Pop_Value()   2014-10-10
+		tempValue = Stack_Pop_value();
+		Control_Stack[Stack_Index] -= tempValue;		//subtract proper operand from TOP-of-STACK.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
+		return TRUE;
+		break;
+
+	case Stack_Multiply:
+		if (Stack_Index < 1) return FALSE;
+		///////////2014-10-10: ------------------ Control_Stack[Stack_Index] *= Stack_Pop_value();		//multiply TOP-of-STACK by proper operand
+
+		tempValue = Stack_Pop_value();
+		Control_Stack[Stack_Index] *= tempValue;		//multiply TOP-of-STACK by proper operand.  Must do in 2 steps.  OPTIMIZER WAS KILLING US IN DLL PROJECT!!!!!!!!!
+		return TRUE;
+		break;
+
+	case Stack_Divide:
+		if (Stack_Index < 1) return FALSE;
+		tempValue = Stack_Pop_value();			//DIVIDE was already set up to use tempValue, and it works fine even when OPTIMIZE FOR SIZE is turned on.
+		if (tempValue != 0.0)
+			Control_Stack[Stack_Index] /= tempValue;		//divide TOP-of-STACK by proper operand
+		else if (Control_Stack[Stack_Index] != 0.0)
+			Control_Stack[Stack_Index] = BIG_NUMBER;				//return a "big" number if divide by zero (but just leave Control_Stack[Stack_Index] = 0.0 if we see 0.0 / 0.0)
+		return TRUE;
+		break;
+
+	case Stack_Expo:
+		if (Stack_Index < 1) return FALSE;
+		tempValue = Stack_Pop_value();
+		Control_Stack[Stack_Index] = pow(Control_Stack[Stack_Index], tempValue);		//raise TOP-of-STACK to the "operand" power
+		return TRUE;
+		break;
+
+		//do not use Stack_Pop_value() for UNARY operators.  We do NOT want to pop the stack!
+	case Stack_Invert:
+		if (Stack_Index < 0) return FALSE;
+		if (Control_Stack[Stack_Index] != 0.0)
+			Control_Stack[Stack_Index] = 1.0 / Control_Stack[Stack_Index];
+		return TRUE;
+		break;
+
+	case Stack_ChangeSign:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] *= -1.00;
+		return TRUE;
+		break;
+
+	case Stack_Swap:
+		if (Stack_Index < 1) return FALSE;
+		tempValue = Control_Stack[Stack_Index];
+		Control_Stack[Stack_Index] = Control_Stack[Stack_Index - 1];
+		Control_Stack[Stack_Index - 1] = tempValue;
+		return TRUE;
+		break;
+
+	case Stack_LOG10:
+		if (Stack_Index < 0) return FALSE;
+		if (Control_Stack[Stack_Index] > 0.0)
+			Control_Stack[Stack_Index] = log10(Control_Stack[Stack_Index]);
+		else
+			Control_Stack[Stack_Index] = 0.0;
+		return TRUE;
+		break;
+
+	case Stack_LN:
+		if (Stack_Index < 0) return FALSE;
+		if (Control_Stack[Stack_Index] > 0.0)
+			Control_Stack[Stack_Index] = log(Control_Stack[Stack_Index]);
+		else
+			Control_Stack[Stack_Index] = 0.0;
+		return TRUE;
+		break;
+
+	case Stack_EXP:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] = exp(Control_Stack[Stack_Index]);
+		return TRUE;
+		break;
+
+	case Stack_SQRT:
+		if (Stack_Index < 0) return FALSE;
+		if (Control_Stack[Stack_Index] > 0.0)
+			Control_Stack[Stack_Index] = sqrt(Control_Stack[Stack_Index]);
+		else
+			Control_Stack[Stack_Index] = 0.0;
+		return TRUE;
+		break;
+
+	case Stack_SIN:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] = sin(Control_Stack[Stack_Index]);			//input angle in RADIANS
+		return TRUE;
+		break;
+
+	case Stack_COS:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] = cos(Control_Stack[Stack_Index]);			//input angle in RADIANS
+		return TRUE;
+		break;
+
+	case Stack_TAN:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] = tan(Control_Stack[Stack_Index]);			//input angle in RADIANS
+		return TRUE;
+		break;
+
+	case Stack_ASIN:
+		if (Stack_Index < 0) return FALSE;
+		if (fabs(Control_Stack[Stack_Index]) <= 1.0)
+			Control_Stack[Stack_Index] = asin(Control_Stack[Stack_Index]);		//result angle in RADIANS
+		else
+			Control_Stack[Stack_Index] = BIG_NUMBER;
+		return TRUE;
+		break;
+
+	case Stack_ACOS:
+		if (Stack_Index < 0) return FALSE;
+		if (fabs(Control_Stack[Stack_Index]) <= 1.0)
+			Control_Stack[Stack_Index] = acos(Control_Stack[Stack_Index]);		//result angle in RADIANS
+		else
+			Control_Stack[Stack_Index] = BIG_NUMBER;
+		return TRUE;
+		break;
+
+	case Stack_ATAN:
+		if (Stack_Index < 0) return FALSE;
+		Control_Stack[Stack_Index] = atan(Control_Stack[Stack_Index]);			//result angle in RADIANS
+		return TRUE;
+		break;
+
+
+		//Stack comparison operators follow.  Return TRUE or FALSE based on comparison:
+
+
+	case Stack_Equal:
+		if (Stack_Index < 1) return FALSE;
+		if (fabs(Control_Stack[Stack_Index] - Control_Stack[Stack_Index - 1]) <= EPSILON)
+			return TRUE;		//if TOP-of-STACK is CLOSE ENOUGH TO EQUAL TO the next item on the stack
+		else
+			return FALSE;
+		break;
+
+	case Stack_NotEqual:
+		if (Stack_Index < 1) return FALSE;
+		if (fabs(Control_Stack[Stack_Index] - Control_Stack[Stack_Index - 1]) > EPSILON)
+			return TRUE;		//if TOP-of-STACK is NOT CLOSE ENOUGH TO EQUAL TO the next item on the stack
+		else
+			return FALSE;
+		break;
+
+	case Stack_Greater:
+		if (Stack_Index < 1) return FALSE;
+		if (Control_Stack[Stack_Index] > Control_Stack[Stack_Index - 1])
+			return TRUE;		//if TOP-of-STACK is GREATER THAN the next item on the stack
+		else
+			return FALSE;
+		break;
+
+	case Stack_GreaterEqual:
+		if (Stack_Index < 1) return FALSE;
+		if (Control_Stack[Stack_Index] >= Control_Stack[Stack_Index - 1])
+			return TRUE;		//if TOP-of-STACK is GREATER THAN OR EQUAL TO the next item on the stack
+		else
+			return FALSE;
+		break;
+
+
+	case Stack_LessThan:
+		if (Stack_Index < 1) return FALSE;
+		if (Control_Stack[Stack_Index] < Control_Stack[Stack_Index - 1])
+			return TRUE;		//if TOP-of-STACK is LESS THAN the next item on the stack
+		else
+			return FALSE;
+		break;
+
+	case Stack_LessThanEqual:
+		if (Stack_Index < 1) return FALSE;
+		if (Control_Stack[Stack_Index] <= Control_Stack[Stack_Index - 1])
+			return TRUE;		//if TOP-of-STACK is LESS THAN OR EQUAL TO the next item on the stack
+		else
+			return FALSE;
+		break;
+
+
+
+		// ********************************************************************************************************************************************************
+		// ********************************************************************************************************************************************************
+		// ********************************************************************************************************************************************************
+
+
+	}
+	return FALSE;
+}
+
+
+
+
 
 
 void Stack_Push(double TopValue) {
@@ -2050,7 +1877,7 @@ void  deleteRules(void)
 
 //=============================================================================
 
-
+// Added by Fred M. in 2014. - Emnet ///RK 
 int  findExactMatch(char *s, char *keyword[])
 //
 //  Input:   s = character string
@@ -2062,7 +1889,8 @@ int  findExactMatch(char *s, char *keyword[])
    int i = 0;
    while (keyword[i] != NULL)
    {
-      if ( strcomp(s, keyword[i]) ) return(i);
+      if ( strcomp(s, keyword[i]) ) 
+		  return(i);
       i++;
    }
    return(-1);
